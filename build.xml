@@ -1,0 +1,77 @@
+<project name="erlike" basedir="." default="main">
+  <property file="build.properties" />
+  <property name="jar.file"
+            value="${dist.dir}/${ant.project.name}-${version}.jar" />
+
+  <path id="classpath">
+    <fileset dir="${lib.dir}" includes="**/*.jar" />
+  </path>
+
+  <path id="classpath.test">
+    <fileset dir="${dist.dir}" includes="**/*.jar" />
+    <pathelement location="${classes-test.dir}" />
+    <path refid="classpath" />
+  </path>
+
+  <presetdef name="javac">
+    <javac includeantruntime="false" />
+  </presetdef>
+
+  <target name="clean">
+    <delete dir="${build.dir}" />
+  </target>
+
+  <target name="compile">
+    <mkdir dir="${classes.dir}" />
+    <javac srcdir="${src.dir}"
+           destdir="${classes.dir}"
+           classpathref="classpath"
+           target="1.8">
+      <compilerarg value="-Xlint" />
+    </javac>
+  </target>
+
+  <target name="doc">
+    <javadoc sourcepath="${src.dir}" destdir="${doc.dir}" />
+  </target>
+
+  <target name="build" depends="compile">
+    <mkdir dir="${dist.dir}" />
+    <jar destfile="${jar.file}"
+         basedir="${classes.dir}">
+      <manifest>
+        <attribute name="Implementation-Version" value="${version}" />
+      </manifest>
+    </jar>
+  </target>
+
+  <target name="rebuild" depends="clean,build" />
+
+  <target name="compile-test" depends="build">
+    <mkdir dir="${classes-test.dir}" />
+    <javac srcdir="${src-test.dir}"
+           destdir="${classes-test.dir}"
+           classpathref="classpath.test" />
+  </target>
+
+  <target name="main" depends="compile-test">
+    <junit fork="true">
+      <classpath refid="classpath.test" />
+      <formatter type="brief" usefile="false" />
+      <test name="${package}.Main" />
+    </junit>
+  </target>
+
+  <target name="test" depends="compile-test">
+    <mkdir dir="${reports.dir}" />
+    <junit>
+      <classpath refid="classpath.test" />
+      <formatter type="brief" usefile="false" />
+      <batchtest fork="yes">
+        <fileset dir="${src-test.dir}">
+          <include name="**/*Test.java" />
+        </fileset>
+      </batchtest>
+    </junit>
+  </target>
+</project>
