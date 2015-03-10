@@ -1,6 +1,7 @@
 package erlike;
 
-/*package-local*/ final class PidImpl implements Pid {
+/*package-local*/
+final class PidImpl implements Pid {
     private final Node contextNode;
     private final int nodeId;
     private final int procId;
@@ -11,11 +12,13 @@ package erlike;
         this.procId = procId;
     }
 
-    @Override public void send(Object msg) {
+    @Override
+    public void send(Object msg) {
         contextNode.sendById(nodeId, procId, msg);
     }
 
-    @Override public boolean equals(Object other) {
+    @Override
+    public boolean equals(Object other) {
         if (other instanceof PidImpl) {
             PidImpl pid = (PidImpl)other;
             return this.procId == pid.procId && this.nodeId == pid.nodeId;
@@ -23,7 +26,18 @@ package erlike;
         return false;
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
         return nodeId ^ procId;
     }
+
+    @Override
+    public String toString() {
+        if (nodeId == Node.SELF_NODE_ID)
+            return String.format("%s->%d", contextNode.getName(), procId);
+        return String.format("%s->%d->%d", contextNode.getName(), nodeId, procId);
+    }
+
+    @Override
+    public String getName() { return toString(); }
 }

@@ -1,4 +1,4 @@
 erlike
 ======
 
-Erlang-like concurrency in Java.
+Experimental Erlang-like concurrency in Java.
