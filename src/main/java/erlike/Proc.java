@@ -21,14 +21,14 @@ package erlike;
 import java.time.*;
 import java.util.concurrent.*;
 import java.util.function.*;
-import java.util.logging.*;
+import org.slf4j.*;
 
 /**
  * An Erlike process. This is a specialized thread with builtin functions
  * (i.e. protected final methods). User defined Procs will subclass this.
  */
 public abstract class Proc extends Thread {
-    private static final Logger log = Logger.getLogger(Proc.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(Proc.class);
 
     /** A unique exception used to signal that a Proc is exiting. */
     private static final RuntimeException EXIT = new RuntimeException() {
@@ -45,7 +45,10 @@ public abstract class Proc extends Thread {
     private Pid pid;
 
     /** The queue of incoming messages. */
-    private BlockingQueue<Object> mailbox;
+    private Mailbox<Object> mailbox;
+
+    /** The context object for this proc. */
+    private ProcContext context;
 
     /**
      * Bind this Proc to a {@link Node}, establishing its identity.
@@ -54,15 +57,15 @@ public abstract class Proc extends Thread {
      * @param node The {@link Node} this Proc is running on.
      * @param pid The {@link Pid} used to identify this node.
      */
-    /*package-local*/
     void bindAndStart(final Node node, final Pid pid) {
         if (isBound)
-            throw new RuntimeException("Proc cannot be bound twice.");
+            throw new IllegalStateException("Proc cannot be bound twice.");
         this.setName(pid.toString());
         this.setUncaughtExceptionHandler(node);
         this.node = node;
         this.pid = pid;
-        this.mailbox = new LinkedBlockingQueue<Object>();
+        this.mailbox = new Mailbox<Object>();
+        this.context = new Context(this, node);
         this.isBound = true;
         this.start();
     }
@@ -84,7 +87,7 @@ public abstract class Proc extends Thread {
     /**
      * Add mail to the mailbox.
      */
-    /*package-local*/
+
     final void addMail(Object msg) {
         mailbox.offer(msg);
     }
@@ -98,12 +101,12 @@ public abstract class Proc extends Thread {
         try {
             main();
         } catch (InterruptedException e) {
-            // we were 'asked' to shutdown
-            log.fine(getName() + " was interrupted.");
+            log.debug("proc interrupted.", getName(), e);
         } catch (Exception e) {
             if (e != EXIT)
-                log.log(Level.WARNING, getName() + " threw and exception.", e);
+                log.warn("proc threw an unexpected exception.", getName(), e);
         } finally {
+            log.debug("proc exited.", getName());
             node.notifyExit(this);
         }
     }
@@ -219,11 +222,67 @@ public abstract class Proc extends Thread {
     /**
      * Exit the Proc immediately. This can be used to return from inside of lambdas.
      * Inside main, it has the same effect as {@code return}.
-     *
-     * @throws Exception The exception signaling a Proc exit.
      */
-    protected final void exit() throws Exception {
+    protected final void exit() {
         throw EXIT;
+    }
+
+    /**
+     * Returns the context object for this proc.
+     *
+     * @return The context object for this proc.
+     */
+    protected final ProcContext getContext() {
+        return context;
+    }
+
+    /**
+     * This class provides a proxy to Proc's builtin functions.
+     * Procs derived from lambdas will use this to access those functions.
+     */
+    static class Context implements ProcContext {
+        private Proc proc;
+        private Node node;
+
+        protected Context(Proc proc, Node node) {
+            this.proc = proc;
+            this.node = node;
+        }
+
+        @Override
+        public final void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler) throws InterruptedException {
+            proc.receive(handler, timeout, timeoutHandler);
+        }
+
+        @Override
+        public final void receive(Consumer<Object> handler, Duration timeout) throws InterruptedException {
+            proc.receive(handler, timeout);
+        }
+
+        @Override
+        public final void receive(Consumer<Object> handler) throws InterruptedException {
+            proc.receive(handler);
+        }
+
+        @Override
+        public final Pid spawn(Class<? extends Proc> procType) {
+            return node.spawn(procType);
+        }
+
+        @Override
+        public final Pid spawn(Class<? extends Proc> procType, Object... args) {
+            return node.spawn(procType, args);
+        }
+
+        @Override
+        public final void checkForInterrupt() throws InterruptedException {
+            proc.checkForInterrupt();
+        }
+
+        @Override
+        public final void exit() throws Exception {
+            proc.exit();
+        }
     }
 }
 

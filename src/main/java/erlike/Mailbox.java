@@ -35,7 +35,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
     /**
      * Nodes used to store waiting mail.
      *
-     * @param <T> The type of mail held.
+     * @param <E> The type of mail held.
      */
     private static class Node<E> {
         public E item;

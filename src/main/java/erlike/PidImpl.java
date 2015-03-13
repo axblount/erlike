@@ -18,7 +18,6 @@
  */
 package erlike;
 
-/*package-local*/
 final class PidImpl implements Pid {
     private final Node contextNode;
     private final int nodeId;

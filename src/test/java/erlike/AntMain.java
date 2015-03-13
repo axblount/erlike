@@ -3,7 +3,7 @@ package erlike;
 import org.junit.*;
 import java.util.function.Consumer;
 
-public class Main {
+public class AntMain {
     public static class TestProc extends Proc {
         private final String saying;
         public TestProc(String saying) {
