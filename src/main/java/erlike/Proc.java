@@ -53,7 +53,7 @@ public abstract class Proc extends Thread {
      * @param homeNode The {@link Node} this Proc is running on.
      * @return Pid of the bound process.
      */
-    Pid startInNode(final Node homeNode) {
+    final Pid startInNode(final Node homeNode) {
         if (homeNode == null)
             throw new NullPointerException("Proc cannot be bound to null Node.");
         if (getState() != State.NEW)
@@ -76,13 +76,6 @@ public abstract class Proc extends Thread {
      * @throws Exception Procs are allowed to throw exceptions.
      */
     protected abstract void main() throws Exception;
-
-    /**
-     * @return The {@link Pid} of this Proc.
-     */
-    public Pid self() {
-        return this.pid;
-    }
 
     /**
      * Add mail to the mailbox.
@@ -123,8 +116,22 @@ public abstract class Proc extends Thread {
     }
 
     /*=====================*/
-    /*  BIFs               */
+    /*  Library Functions  */
     /*=====================*/
+
+    /**
+     * @return The {@link Pid} of this Proc.
+     */
+    public final Pid self() {
+        return this.pid;
+    }
+
+    /**
+     * @return The node this proc is running on.
+     */
+    public final Node node() {
+        return homeNode;
+    }
 
     /**
      * Receive a message within the given timeout, otherwise run a timeout handler.
@@ -190,39 +197,6 @@ public abstract class Proc extends Thread {
     protected final void receive(Consumer<Object> handler)
       throws InterruptedException {
         receive(handler, null, null);
-    }
-
-    /**
-     * Spawn a Proc on the current {@link Node}.
-     *
-     * @param procType The type of Proc to spawn.
-     * @return The Pid of the new Proc.
-     */
-    protected final Pid spawn(Class<? extends Proc> procType) {
-        return homeNode.spawn(procType);
-    }
-
-    /**
-     * Spawn a Proc with arguments on the current {@link Node}.
-     *
-     * @param procType The type of Proc to spawn.
-     * @param args The arguments for the new Proc.
-     * @return The Pid of the new Proc.
-     */
-    protected final Pid spawn(Class<? extends Proc> procType, Object... args) {
-        return homeNode.spawn(procType, args);
-    }
-
-    /**
-     * Exit if the current thread is interrupted. This method should be run
-     * at regular intervals if a Proc is performing some long running task while
-     * not communicating with other nodes.
-     *
-     * @throws InterruptedException If the current Proc has been interrupted.
-     */
-    protected final void checkForInterrupt() throws InterruptedException {
-        if (Thread.interrupted())
-            throw new InterruptedException();
     }
 
     /**

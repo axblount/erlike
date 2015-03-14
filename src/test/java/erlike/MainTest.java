@@ -1,7 +1,7 @@
 package erlike;
 
 import org.junit.*;
-import static erlike.BIFs.*;
+import static erlike.Library.*;
 
 public class MainTest {
     public static class TestProc extends Proc {
@@ -40,7 +40,21 @@ public class MainTest {
         t.send("Hello there.");
         t.send(12345);
         what.send("A SECRET");
+    }
 
-        node.joinAll();
+    @Test
+    public void main2() throws InterruptedException {
+        Node test = new Node("test");
+
+        Pid p1 = test.spawn(() -> {
+            System.out.println(self() + " is running.");
+            receive(msg ->
+                    System.out.println(self() + " got: " + msg));
+        });
+
+        test.spawn(() -> {
+            System.out.println(self() + " is running.");
+            p1.send("Hello from " + self());
+        });
     }
 }

@@ -114,6 +114,8 @@ public class SignalBarrier {
      * @return The timeout minus the number of nanoseconds that passed while waiting.
      */
     public long awaitNanos(long timeout) throws InterruptedException {
+        if (timeout <= 0)
+            return 0;
         // Get the thread that would like to await the signal.
         Thread t = Thread.currentThread();
 

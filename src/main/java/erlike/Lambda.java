@@ -24,20 +24,20 @@ package erlike;
 public class Lambda {
     /**
      * An anonymous proc that uses a user provided lambda
-     * as its main function.
+     * as its lambda function.
      */
     static class Anon extends Proc {
-        private final Zero main;
+        private final Zero lambda;
 
         Anon(final Zero lambda) {
             if (lambda == null)
                 throw new NullPointerException();
-            this.main = lambda;
+            this.lambda = lambda;
         }
 
         @Override
         protected void main() throws Exception {
-            main.run();
+            lambda.run();
         }
     }
 
@@ -47,20 +47,21 @@ public class Lambda {
      * @param <T> The type of the recursive argument.
      */
     static class Rec<T> extends Proc {
-        private final Recursive<T> main;
-        private T arg;
+        private final Recursive<T> lambda;
+        private final T initArg;
 
-        Rec(final Recursive<T> main, final T arg) {
-            if (main == null || arg == null)
+        Rec(final Recursive<T> lambda, final T initArg) {
+            if (lambda == null || initArg == null)
                 throw new NullPointerException();
-            this.main = main;
-            this.arg = arg;
+            this.lambda = lambda;
+            this.initArg = initArg;
         }
 
         @Override
         protected void main() throws Exception {
+            T arg = initArg;
             while (arg != null)
-                arg = main.apply(arg);
+                arg = lambda.apply(arg);
         }
     }
 
