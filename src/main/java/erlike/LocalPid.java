@@ -18,43 +18,31 @@
  */
 package erlike;
 
-final class PidImpl implements Pid {
-    private final Node contextNode;
-    private final int nodeId;
-    private final int procId;
+final class LocalPid implements Pid {
+    private final Node homeNode;
+    private final long procId;
 
-    PidImpl(final Node contextNode, final int nodeId, final int procId) {
-        this.contextNode = contextNode;
-        this.nodeId = nodeId;
+    LocalPid(final Node contextNode, final long procId) {
+        this.homeNode = contextNode;
         this.procId = procId;
     }
 
     @Override
     public void send(Object msg) {
-        contextNode.sendById(nodeId, procId, msg);
+        homeNode.sendById(procId, msg);
     }
 
     @Override
     public boolean equals(Object other) {
-        if (other instanceof PidImpl) {
-            PidImpl pid = (PidImpl)other;
-            return this.procId == pid.procId && this.nodeId == pid.nodeId;
+        if (other instanceof LocalPid) {
+            LocalPid pid = (LocalPid)other;
+            return this.procId == pid.procId && this.homeNode == pid.homeNode;
         }
         return false;
     }
 
     @Override
-    public int hashCode() {
-        return nodeId ^ procId;
-    }
-
-    @Override
     public String toString() {
-        if (nodeId == Node.SELF_NODE_ID)
-            return String.format("%s->%d", contextNode.getName(), procId);
-        return String.format("%s->%d->%d", contextNode.getName(), nodeId, procId);
+        return String.format("%s->%d", homeNode.getName(), procId);
     }
-
-    @Override
-    public String getName() { return toString(); }
 }

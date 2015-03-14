@@ -20,6 +20,9 @@ package erlike;
 
 import java.util.Arrays;
 import java.lang.reflect.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 import org.slf4j.*;
 
 /**
@@ -34,8 +37,11 @@ public class Node implements Thread.UncaughtExceptionHandler {
     /** The name of the Node. */
     private final String name;
 
-    /** A {@link Registry} of all running {@link Proc}s. */
-    private final Registry<Proc> procs;
+    /**
+     * A map of procs by their thread ids.
+     * @see Thread#getId()
+     */
+    private final ConcurrentMap<Long, Proc> procs;
 
     /**
      * Create a new Node.
@@ -44,7 +50,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
      */
     public Node(String name) {
         this.name = name;
-        this.procs = new Registry<Proc>(1000);
+        this.procs = new ConcurrentHashMap<>();
         log.debug("Node starting: {}.", name);
     }
 
@@ -71,7 +77,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param procId The id of the target {@link Proc}.
      * @param msg The message to send.
      */
-    final void sendById(final int procId, final Object msg) {
+    final void sendById(final long procId, final Object msg) {
         Proc proc = procs.get(procId);
         if (proc != null)
             proc.addMail(msg);
@@ -84,9 +90,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param procId The id of the target {@link Proc}.
      * @param msg The message to send.
      */
-    final void sendById(final int nodeId, final int procId, final Object msg) {
-        if (nodeId == SELF_NODE_ID)
-            sendById(procId, msg);
+    final void sendById(final int nodeId, final long procId, final Object msg) {
         // TODO
     }
 
@@ -123,7 +127,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
             throw new RuntimeException("Couldn't spawn proc.", e);
         }
 
-        Pid pid = registerAndBind(proc);
+        Pid pid = bindAndStart(proc);
         log.debug("{} of type {} spawned.", pid, procType);
         return pid;
     }
@@ -149,8 +153,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public Pid spawn(Lambda.Zero zero) {
         if (zero == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Anon(ctx -> zero.accept(ctx));
-        return registerAndBind(proc);
+        Proc proc = new Lambda.Anon(zero);
+        return bindAndStart(proc);
     }
 
     /**
@@ -164,8 +168,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public <A> Pid spawn(Lambda.One<A> one, A a) {
         if (one == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Anon(ctx -> one.accept(ctx, a));
-        return registerAndBind(proc);
+        Proc proc = new Lambda.Anon(() -> one.accept(a));
+        return bindAndStart(proc);
     }
 
     /**
@@ -179,8 +183,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public <T> Pid spawnRecursive(Lambda.Recursive<T> rec, T t) {
         if (rec == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Rec<T>(rec, t);
-        return registerAndBind(proc);
+        Proc proc = new Lambda.Rec<>(rec, t);
+        return bindAndStart(proc);
     }
 
     /**
@@ -196,8 +200,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public <A, B> Pid spawn(Lambda.Two<A, B> two, A a, B b) {
         if (two == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Anon(ctx -> two.accept(ctx, a, b));
-        return registerAndBind(proc);
+        Proc proc = new Lambda.Anon(() -> two.accept(a, b));
+        return bindAndStart(proc);
     }
 
     /**
@@ -215,8 +219,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public <A, B, C> Pid spawn(Lambda.Three<A, B, C> three, A a, B b, C c) {
         if (three == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Anon(ctx -> three.accept(ctx, a, b, c));
-        return registerAndBind(proc);
+        Proc proc = new Lambda.Anon(() -> three.accept(a, b, c));
+        return bindAndStart(proc);
     }
 
     /**
@@ -236,8 +240,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public <A, B, C, D> Pid spawn(Lambda.Four<A, B, C, D> four, A a, B b, C c, D d) {
         if (four == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Anon(ctx -> four.accept(ctx, a, b, c, d));
-        return registerAndBind(proc);
+        Proc proc = new Lambda.Anon(() -> four.accept(a, b, c, d));
+        return bindAndStart(proc);
     }
 
     /**
@@ -246,10 +250,9 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param proc The proc to register, bind, and start.
      * @return The pid of the new proc.
      */
-    private Pid registerAndBind(Proc proc) {
-        int procId = procs.register(proc);
-        Pid pid = new PidImpl(this, SELF_NODE_ID, procId);
-        proc.bindAndStart(this, pid);
+    private Pid bindAndStart(Proc proc) {
+        Pid pid = proc.startInNode(this);
+        procs.put(proc.getId(), proc);
         log.debug("{} spawned.", pid);
         return pid;
     }
@@ -262,7 +265,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     void notifyExit(Proc proc) {
         log.debug("Node was notified that {} exited.", proc.self());
         // TODO: In the future this will notify linked nodes and monitors.
-        procs.removeValue(proc);
+        if (!procs.remove(proc.getId(), proc))
+            log.error("Tried to remove {} after exit, but failed!", proc);
     }
 
     /**

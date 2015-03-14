@@ -18,7 +18,14 @@
  */
 package erlike;
 
+/**
+ * The class provides functional interfaces for anonymous procs.
+ */
 public class Lambda {
+    /**
+     * An anonymous proc that uses a user provided lambda
+     * as its main function.
+     */
     static class Anon extends Proc {
         private final Zero main;
 
@@ -30,10 +37,15 @@ public class Lambda {
 
         @Override
         protected void main() throws Exception {
-            main.accept(getContext());
+            main.run();
         }
     }
 
+    /**
+     * A recursive proc.
+     *
+     * @param <T> The type of the recursive argument.
+     */
     static class Rec<T> extends Proc {
         private final Recursive<T> main;
         private T arg;
@@ -47,39 +59,38 @@ public class Lambda {
 
         @Override
         protected void main() throws Exception {
-            ProcContext ctx = getContext();
             while (arg != null)
-                arg = main.apply(ctx, arg);
+                arg = main.apply(arg);
         }
     }
 
     @FunctionalInterface
     public interface Zero {
-        public void accept(ProcContext ctx) throws Exception;
+        public void run() throws Exception;
     }
 
     @FunctionalInterface
     public interface One<A> {
-        public void accept(ProcContext ctx, A a) throws Exception;
+        public void accept(A a) throws Exception;
     }
 
     @FunctionalInterface
     public interface Two<A, B> {
-        public void accept(ProcContext ctx, A a, B b) throws Exception;
+        public void accept(A a, B b) throws Exception;
     }
 
     @FunctionalInterface
     public interface Three<A, B, C> {
-        public void accept(ProcContext ctx, A a, B b, C c) throws Exception;
+        public void accept(A a, B b, C c) throws Exception;
     }
 
     @FunctionalInterface
     public interface Four<A, B, C, D> {
-        public void accept(ProcContext ctx, A a, B b, C c, D d) throws Exception;
+        public void accept(A a, B b, C c, D d) throws Exception;
     }
 
     @FunctionalInterface
     public interface Recursive<T> {
-        public T apply(ProcContext ctx, T arg) throws Exception;
+        public T apply(T arg) throws Exception;
     }
 }

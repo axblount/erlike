@@ -1,9 +1,9 @@
 package erlike;
 
 import org.junit.*;
-import java.util.function.Consumer;
+import static erlike.BIFs.*;
 
-public class AntMain {
+public class MainTest {
     public static class TestProc extends Proc {
         private final String saying;
         public TestProc(String saying) {
@@ -31,8 +31,15 @@ public class AntMain {
         Node node = new Node("test");
 
         Pid t = node.spawn(TestProc.class, "Sounds good!");
+        Pid what = node.spawn(() -> {
+            System.out.println("Anonymous baby!");
+            receive(o -> System.out.println("got: " + o));
+            exit();
+            System.out.println("This shouldn't print!");
+        });
         t.send("Hello there.");
         t.send(12345);
+        what.send("A SECRET");
 
         node.joinAll();
     }

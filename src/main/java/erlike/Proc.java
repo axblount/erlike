@@ -26,6 +26,8 @@ import org.slf4j.*;
 /**
  * An Erlike process. This is a specialized thread with builtin functions
  * (i.e. protected final methods). User defined Procs will subclass this.
+ *
+ * It extends Thread because I am a wild man.
  */
 public abstract class Proc extends Thread {
     private static final Logger log = LoggerFactory.getLogger(Proc.class);
@@ -35,11 +37,8 @@ public abstract class Proc extends Thread {
         static final long serialVersionUID = 1L;
     };
 
-    /** Has this Proc been bound to a {@link Node}? */
-    private boolean isBound = false;
-
     /** The {@link Node} this Proc is running on. */
-    private Node node;
+    private Node homeNode;
 
     /** The process id of this Proc. */
     private Pid pid;
@@ -47,27 +46,28 @@ public abstract class Proc extends Thread {
     /** The queue of incoming messages. */
     private Mailbox<Object> mailbox;
 
-    /** The context object for this proc. */
-    private ProcContext context;
-
     /**
      * Bind this Proc to a {@link Node}, establishing its identity.
      * This should be called exactly once.
      *
-     * @param node The {@link Node} this Proc is running on.
-     * @param pid The {@link Pid} used to identify this node.
+     * @param homeNode The {@link Node} this Proc is running on.
+     * @return Pid of the bound process.
      */
-    void bindAndStart(final Node node, final Pid pid) {
-        if (isBound)
+    Pid startInNode(final Node homeNode) {
+        if (homeNode == null)
+            throw new NullPointerException("Proc cannot be bound to null Node.");
+        if (getState() != State.NEW)
             throw new IllegalStateException("Proc cannot be bound twice.");
-        this.setName(pid.toString());
-        this.setUncaughtExceptionHandler(node);
-        this.node = node;
-        this.pid = pid;
-        this.mailbox = new Mailbox<Object>();
-        this.context = new Context(this, node);
-        this.isBound = true;
-        this.start();
+
+        this.homeNode = homeNode;
+        pid = new LocalPid(this.homeNode, getId());
+        mailbox = new Mailbox<>();
+
+        setName(pid.toString());
+        setUncaughtExceptionHandler(this.homeNode);
+        start();
+
+        return this.pid;
     }
 
     /**
@@ -101,13 +101,14 @@ public abstract class Proc extends Thread {
         try {
             main();
         } catch (InterruptedException e) {
-            log.debug("proc interrupted.", getName(), e);
+            log.debug("{} interrupted.", pid, e);
         } catch (Exception e) {
-            if (e != EXIT)
-                log.warn("proc threw an unexpected exception.", getName(), e);
+            if (e == EXIT)
+                log.debug("{} exited.", pid);
+            else
+                log.warn("{} threw an unexpected exception.", pid, e);
         } finally {
-            log.debug("proc exited.", getName());
-            node.notifyExit(this);
+            homeNode.notifyExit(this);
         }
     }
 
@@ -139,10 +140,19 @@ public abstract class Proc extends Thread {
      */
     protected final void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler)
       throws InterruptedException {
+        if (handler == null)
+            throw new NullPointerException("recieve requires a non-null message handler.");
         if (timeout == null && timeoutHandler != null)
-            throw new RuntimeException("receive requires a valid timeout");
+            throw new NullPointerException(
+                    "receive requires a valid timeout if the timeoutHandler is not null");
 
-        Object mail = mailbox.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        Object mail;
+        if (timeout == null)
+            mail = mailbox.take();
+        else if (timeout.toNanos() == 0)
+            mail = mailbox.poll();
+        else
+            mail = mailbox.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
 
         if (mail == null && timeoutHandler != null)
             timeoutHandler.run();
@@ -179,11 +189,7 @@ public abstract class Proc extends Thread {
      */
     protected final void receive(Consumer<Object> handler)
       throws InterruptedException {
-        if (handler == null)
-            throw new RuntimeException("receive requires a valid message handler");
-        Object mail = mailbox.take();
-        checkMail(mail);
-        handler.accept(mail);
+        receive(handler, null, null);
     }
 
     /**
@@ -193,7 +199,7 @@ public abstract class Proc extends Thread {
      * @return The Pid of the new Proc.
      */
     protected final Pid spawn(Class<? extends Proc> procType) {
-        return node.spawn(procType);
+        return homeNode.spawn(procType);
     }
 
     /**
@@ -204,7 +210,7 @@ public abstract class Proc extends Thread {
      * @return The Pid of the new Proc.
      */
     protected final Pid spawn(Class<? extends Proc> procType, Object... args) {
-        return node.spawn(procType, args);
+        return homeNode.spawn(procType, args);
     }
 
     /**
@@ -215,7 +221,7 @@ public abstract class Proc extends Thread {
      * @throws InterruptedException If the current Proc has been interrupted.
      */
     protected final void checkForInterrupt() throws InterruptedException {
-        if (isInterrupted())
+        if (Thread.interrupted())
             throw new InterruptedException();
     }
 
@@ -225,64 +231,6 @@ public abstract class Proc extends Thread {
      */
     protected final void exit() {
         throw EXIT;
-    }
-
-    /**
-     * Returns the context object for this proc.
-     *
-     * @return The context object for this proc.
-     */
-    protected final ProcContext getContext() {
-        return context;
-    }
-
-    /**
-     * This class provides a proxy to Proc's builtin functions.
-     * Procs derived from lambdas will use this to access those functions.
-     */
-    static class Context implements ProcContext {
-        private Proc proc;
-        private Node node;
-
-        protected Context(Proc proc, Node node) {
-            this.proc = proc;
-            this.node = node;
-        }
-
-        @Override
-        public final void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler) throws InterruptedException {
-            proc.receive(handler, timeout, timeoutHandler);
-        }
-
-        @Override
-        public final void receive(Consumer<Object> handler, Duration timeout) throws InterruptedException {
-            proc.receive(handler, timeout);
-        }
-
-        @Override
-        public final void receive(Consumer<Object> handler) throws InterruptedException {
-            proc.receive(handler);
-        }
-
-        @Override
-        public final Pid spawn(Class<? extends Proc> procType) {
-            return node.spawn(procType);
-        }
-
-        @Override
-        public final Pid spawn(Class<? extends Proc> procType, Object... args) {
-            return node.spawn(procType, args);
-        }
-
-        @Override
-        public final void checkForInterrupt() throws InterruptedException {
-            proc.checkForInterrupt();
-        }
-
-        @Override
-        public final void exit() throws Exception {
-            proc.exit();
-        }
     }
 }
 
