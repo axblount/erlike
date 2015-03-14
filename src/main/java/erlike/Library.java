@@ -23,44 +23,77 @@ import java.time.Duration;
 import java.util.function.Consumer;
 
 /**
- * This class can be statically imported to access builtin proc functions
- * in anonymous procs. See the protected methods in Proc for their usage.
- *
- * {@code import static erlike.Library.*;}
+ * <p>
+ * This class is statically imported to access builtin Proc functions
+ * ({@link Proc#node()}, {@link Proc#self()}, etc.) in anonymous procs.
+ * See the library methods in Proc for their usage.
+ * </p>
+ * <p>
+ * Calling any of these methods outside of a running Proc will cause
+ * a {@link java.lang.RuntimeException}.
+ * </p>
  */
 public final class Library {
     private static final Logger log = LoggerFactory.getLogger(Library.class);
 
+    /** static class */
     private Library() {}
 
+    /**
+     * Get the Proc executing this method.
+     *
+     * @throws java.lang.RuntimeException If the current thread is not a Proc.
+     *
+     * @return The current thread as a Proc.
+     */
     private static Proc currentProc() {
         Thread t = Thread.currentThread();
         try {
             return (Proc)t;
         } catch (ClassCastException e) {
             log.error("Non-Proc thread {} attempted to use Proc Library.", t, e);
-            throw new IllegalThreadStateException("Cannot call Proc Library functions from outside a Proc");
+            throw new RuntimeException("Cannot call Proc Library functions from outside a Proc");
         }
     }
 
+    /**
+     * @see Proc#self()
+     * @return The process id of the current Proc.
+     */
     public static Pid self() {
         return currentProc().self();
     }
 
+    /**
+     * @see Proc#node()
+     * @return The node the current proc is running on.
+     */
     public static Node node() { return currentProc().node(); }
 
+    /**
+     * @see Proc#receive(Consumer, Duration, Runnable)
+     */
     public static void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler) throws InterruptedException {
         currentProc().receive(handler, timeout, timeoutHandler);
     }
 
+    /**
+     * @see Proc#receive(Consumer, Duration)
+     */
     public static void receive(Consumer<Object> handler, Duration timeout) throws InterruptedException {
         receive(handler, timeout, null);
     }
 
+    /**
+     * @see Proc#receive(Consumer)
+     */
     public static void receive(Consumer<Object> handler) throws InterruptedException {
         receive(handler, null, null);
     }
 
+    /**
+     * @see Proc#exit()
+     */
     public static void exit() {
         currentProc().exit();
     }

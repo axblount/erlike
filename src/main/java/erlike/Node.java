@@ -31,9 +31,6 @@ import org.slf4j.*;
 public class Node implements Thread.UncaughtExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(Node.class);
 
-    /** This is the node id used by {@link Proc}s to identify their parent Node. */
-    static final int SELF_NODE_ID = 0;
-
     /** The name of the Node. */
     private final String name;
 
