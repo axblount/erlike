@@ -14,22 +14,24 @@ lambdas and `@FunctionalInterface`s to make spawning processes and communicating
 between them easy.
 
 ```java
-import erlike.*;
-import static erlike.BIFs.*;
+import erlike.*; // Node & Pid
+import static erlike.Library.*; // self & receive
 
 public class Main {
   public static void main(String[] args) {
     Node test = new Node("test");
 
     Pid p1 = test.spawn(() -> {
+      System.out.println("first process running as " + self());
       receive(msg ->
         System.out.println("I got: " + msg));
     });
 
-    Pid p2 = test.spawn(() -> {
+    test.spawn(pid -> {
+      System.out.println("second process running as " + self());
       Thread.sleep(500);
-      p1.send("Hello from process #2!");
-    });
+      pid.send("Hello from " + self());
+    }, p1);
   }
 }
 ```

@@ -43,18 +43,19 @@ public class MainTest {
     }
 
     @Test
-    public void main2() throws InterruptedException {
+    public void readmeExample() throws InterruptedException {
         Node test = new Node("test");
 
         Pid p1 = test.spawn(() -> {
-            System.out.println(self() + " is running.");
+            System.out.println("first process running as " + self());
             receive(msg ->
-                    System.out.println(self() + " got: " + msg));
+                    System.out.println("I got: " + msg));
         });
 
-        test.spawn(() -> {
-            System.out.println(self() + " is running.");
-            p1.send("Hello from " + self());
-        });
+        test.spawn(pid -> {
+            System.out.println("second process running as " + self());
+            Thread.sleep(500);
+            pid.send("Hello from " + self());
+        }, p1);
     }
 }
