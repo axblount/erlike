@@ -138,7 +138,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @return The {@link Pid} of the spawned Proc.
      */
     public Pid spawn(Class<? extends Proc> procType) {
-        return spawn(procType, (Object[])null);
+        return spawn(procType, (Object[]) null);
     }
 
     /**
@@ -264,6 +264,16 @@ public class Node implements Thread.UncaughtExceptionHandler {
         // TODO: In the future this will notify linked nodes and monitors.
         if (!procs.remove(proc.getId(), proc))
             log.error("Tried to remove {} after exit, but failed!", proc);
+    }
+
+    /**
+     * Used for testing only!!!
+     */
+    Proc unsafeGetProc(Pid pid) {
+        if (pid instanceof LocalPid) {
+            return procs.get(((LocalPid) pid).procId);
+        }
+        return null;
     }
 
     /**

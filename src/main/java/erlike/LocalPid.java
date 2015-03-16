@@ -19,8 +19,8 @@
 package erlike;
 
 final class LocalPid implements Pid {
-    private final Node homeNode;
-    private final long procId;
+    final Node homeNode;
+    final long procId;
 
     LocalPid(final Node contextNode, final long procId) {
         this.homeNode = contextNode;

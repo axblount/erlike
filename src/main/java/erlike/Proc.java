@@ -161,11 +161,12 @@ public abstract class Proc extends Thread {
         else
             mail = mailbox.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
 
-        if (mail == null && timeoutHandler != null)
+        if (mail == null && timeoutHandler != null) {
             timeoutHandler.run();
-
-        checkMail(mail);
-        handler.accept(mail);
+        } else if (mail != null) {
+            checkMail(mail);
+            handler.accept(mail);
+        }
     }
 
     /**
