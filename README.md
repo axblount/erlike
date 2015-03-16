@@ -5,13 +5,12 @@ Erlike
 ![jdk-8](http://img.shields.io/badge/jdk-8-blue.svg?style=flat)
 [![license-AGPL3](http://img.shields.io/badge/license-AGPL3-red.svg?style=flat)](https://github.com/axblount/erlike/blob/master/LICENSE)
 
-Experimental Erlang-style concurrency for Java 1.8
---------------------------------------------------
+Experimental Erlang-style concurrency for Java
+----------------------------------------------
 
-This library isn't doing anything new when it comes to concurrency.
-It's mostly just Erlang-like syntax around `java.lang.Thread`. It uses Java 1.8 
-lambdas and `@FunctionalInterface`s to make spawning processes and communicating 
-between them easy.
+Erlike is a framework for spawning threads and communicating between them. It 
+uses Java 1.8 lambdas and `@FunctionalInterface`s to make life easier. The 
+syntax and mechanics are inspired by Erlang.
 
 ```java
 import erlike.*; // Node & Pid
@@ -36,24 +35,31 @@ public class Main {
 }
 ```
 
-For message passing `erlike` uses the multiple producer, single consumer 
-lock-free queue found at [1024cores][1]. You can find my implementation in
-[Mailbox][2]. I believe this is the same algorithm that [Akka][3] uses. If you 
-notice a problem with my version, please raise an issue!
+For message passing Erlike uses the multiple producer, single consumer lock-free 
+queue found at [1024cores][1]. You can find my implementation in
+[Mailbox.java][2]. This is the same algorithm that [Akka](http://akka.io) uses, 
+though I did not use their implementation in any way. If you notice a problem 
+with my version, please raise an issue!
 
-At the moment, the only external dependencies are JUnit and SLF4J.
+Erlike requires JDK 1.8. The only external dependencies are JUnit and 
+[SLF4J](http://slf4j.org).
 
 Features
 --------
+
+Erlike is still in the early alpha stage. The API is likely to change 
+dramatically from commit to commit.
+
+### Current
 
 * Spawning processes.
 * Sending and receiving messages.
 * Creating links between processes.
 
-Future Milestones
------------------
+### Future Milestones
 
-* ~~Links~~ and monitors
+* Monitors
+* "Pattern match" receive
 * Networking
   * This will be an excellent first opportunity for dogfooding.
 * Command-line interface
@@ -63,4 +69,3 @@ Future Milestones
 
 [1]:http://www.1024cores.net/home/lock-free-algorithms/queues/non-intrusive-mpsc-node-based-queue
 [2]:https://github.com/axblount/erlike/blob/master/src/lambda/java/erlike/Mailbox.java
-[3]:http://akka.io
