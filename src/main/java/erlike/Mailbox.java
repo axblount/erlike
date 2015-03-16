@@ -62,6 +62,10 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
         public void setNext(final Node<E> newNext) {
             nextAccess.set(this, newNext);
         }
+
+        public boolean casNext(final Node<E> expect, final Node<E> newNext) {
+            return nextAccess.compareAndSet(this, expect, newNext);
+        }
     }
 
     @SuppressWarnings("unused")
@@ -87,6 +91,9 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
             throw new NullPointerException();
         Node<E> newTail = new Node<E>(e);
         Node<E> oldTail = tailAccess.getAndSet(this, newTail);
+
+        // oldTail is now out of reach for producers.
+        // we can set it normally.
         oldTail.setNext(newTail);
         insertion.signal();
         return true;
@@ -213,7 +220,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
 
     /**
      * Remove a node from the queue and return its item.
-     * This method will also move the head and tail pointers
+     * This method moves the head and tail pointers
      * as necessary.
      *
      * @param prev The node previous to the one being removed.
@@ -223,18 +230,32 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
     private E removeNode(Node<E> prev, Node<E> node) {
         if (prev == null || node == null)
             throw new NullPointerException();
+        if (prev == node)
+            throw new IllegalArgumentException("Corrupt mailbox");
 
         E result = node.item;
-        // If our result is the tail node,
-        // move the tail up to the previous node.
-        tailAccess.compareAndSet(this, node, prev);
-        // If the previous node is the head,
-        // move the head up.
-        headAccess.compareAndSet(this, prev, node);
-        // FIXME: this is not atomic!
-        // I don't know what to do!
-        prev.setNext(node.getNext());
-        // help GC
+
+        if (tailAccess.compareAndSet(this, node, prev)) {
+            // node was our tail, but now prev is the tail
+            //
+            // even though offer will strip off the dead tail,
+            // we should set prev.next=null so that (take|poll)Match
+            // don't descent into a dead part of the queue.
+            // This shouldn't cause a conflict if only one thread is
+            // reading from the queue.
+            prev.casNext(node, null);
+        } else if (headAccess.compareAndSet(this, prev, node)) {
+            // prev was the sentinel, now node is the sentinel
+            // there's nothing more to do.
+        } else {
+            // prev and node are just two regular nodes in the queue.
+            // skip over next.
+            // This isn't atomic, but I think that's okay, because
+            // only the consumer should be messing around in the middle
+            // of the queue.
+            prev.setNext(node.getNext());
+        }
+
         node.item = null;
         return result;
     }
