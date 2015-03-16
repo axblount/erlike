@@ -23,7 +23,7 @@ package erlike;
  * somewhere within the given Erlike system.
  * The process may be local or remote.
  *
- * Implementations should override Object#equals and Object#toString
+ * Implementations should override Object#equals(Object) and Object#toString().
  */
 public interface Pid {
     /**

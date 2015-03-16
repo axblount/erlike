@@ -53,5 +53,5 @@ Future Milestones
   * Loading jars
 
 [1]:http://www.1024cores.net/home/lock-free-algorithms/queues/non-intrusive-mpsc-node-based-queue
-[2]:https://github.com/axblount/erlike/blob/master/src/lambda/java/erlike/mailbox.java
+[2]:https://github.com/axblount/erlike/blob/master/src/lambda/java/erlike/Mailbox.java
 [3]:http://akka.io

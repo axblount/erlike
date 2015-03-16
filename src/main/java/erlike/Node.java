@@ -18,11 +18,9 @@
  */
 package erlike;
 
-import java.util.Arrays;
+import java.util.*;
 import java.lang.reflect.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-
+import java.util.concurrent.*;
 import org.slf4j.*;
 
 /**
@@ -41,6 +39,11 @@ public class Node implements Thread.UncaughtExceptionHandler {
     private final ConcurrentMap<Long, Proc> procs;
 
     /**
+     * A list of the uncaught exceptions.
+     */
+    private final List<Throwable> uncaughtExceptions;
+
+    /**
      * Create a new Node.
      *
      * @param name The Node's name.
@@ -48,6 +51,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public Node(String name) {
         this.name = name;
         this.procs = new ConcurrentHashMap<>();
+        this.uncaughtExceptions = Collections.synchronizedList(new LinkedList<>());
         log.debug("Node starting: {}.", name);
     }
 
@@ -57,6 +61,16 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @return The Node's name.
      */
     public String getName() { return name; }
+
+    /**
+     * Get all uncaughtExceptions. The caller is free to
+     * remove exceptions or clear the list.
+     *
+     * @return A list of uncaught exceptions.
+     */
+    public List<Throwable> getUncaughtExceptions() {
+        return uncaughtExceptions;
+    }
 
     /**
      * Join all currently running {@link Proc}s.
@@ -260,23 +274,23 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param proc The {@link Proc} that has exited.
      */
     void notifyExit(Proc proc) {
-        log.debug("Node was notified that {} exited.", proc.self());
-        // TODO: In the future this will notify linked nodes and monitors.
-        if (!procs.remove(proc.getId(), proc))
+        log.debug("Proc {} exited.", proc.getId());
+        if (!procs.remove(proc.getId(), proc)) {
             log.error("Tried to remove {} after exit, but failed!", proc);
+            log.error("(Was proc in #procs?)={}", procs.containsValue(proc));
+        }
     }
 
     /**
-     * Handle an uncaught exception thrown by a {@link Proc} running on this node.
+     * Handle an uncaught exception thrown by a {@link Proc} running on this node. If this gets
+     * called, something has gone very wrong.
      *
      * @param t The {@link Thread} that threw the exception. This should be an instance of {@link Proc}.
      * @param e The exception thrown by the {@link Thread}.
      */
     @Override
     public void uncaughtException(Thread t, Throwable e) {
-        if (t instanceof Proc) { // it better be
-            Proc p = (Proc) t;
-            notifyExit(p); // TODO should be failure
-        }
+        log.error("Node {} got an uncaught an exception from {}!!!", name, t, e);
+        uncaughtExceptions.add(e);
     }
 }

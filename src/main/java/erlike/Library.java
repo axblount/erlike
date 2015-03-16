@@ -36,23 +36,23 @@ import java.util.function.Consumer;
 public final class Library {
     private static final Logger log = LoggerFactory.getLogger(Library.class);
 
-    /** static class */
+    // static class
     private Library() {}
 
     /**
      * Get the Proc executing this method.
      *
-     * @throws java.lang.RuntimeException If the current thread is not a Proc.
+     * @throws java.lang.IllegalStateException If the current thread is not a Proc.
      *
      * @return The current thread as a Proc.
      */
     private static Proc currentProc() {
-        Thread t = Thread.currentThread();
-        try {
+        final Thread t = Thread.currentThread();
+        if (t instanceof Proc) {
             return (Proc)t;
-        } catch (ClassCastException e) {
-            log.error("Non-Proc thread {} attempted to use Proc Library.", t, e);
-            throw new RuntimeException("Cannot call Proc Library functions from outside a Proc");
+        } else {
+            log.error("Non-Proc thread {} attempted to use Proc Library.", t);
+            throw new IllegalStateException("Cannot call Proc Library functions from outside a Proc");
         }
     }
 
@@ -68,26 +68,31 @@ public final class Library {
      * @see Proc#node()
      * @return The node the current proc is running on.
      */
-    public static Node node() { return currentProc().node(); }
+    public static Node node() {
+        return currentProc().node();
+    }
 
     /**
      * @see Proc#receive(Consumer, Duration, Runnable)
      */
-    public static void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler) throws InterruptedException {
+    public static void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler)
+            throws InterruptedException {
         currentProc().receive(handler, timeout, timeoutHandler);
     }
 
     /**
      * @see Proc#receive(Consumer, Duration)
      */
-    public static void receive(Consumer<Object> handler, Duration timeout) throws InterruptedException {
+    public static void receive(Consumer<Object> handler, Duration timeout)
+            throws InterruptedException {
         receive(handler, timeout, null);
     }
 
     /**
      * @see Proc#receive(Consumer)
      */
-    public static void receive(Consumer<Object> handler) throws InterruptedException {
+    public static void receive(Consumer<Object> handler)
+            throws InterruptedException {
         receive(handler, null, null);
     }
 
@@ -96,5 +101,19 @@ public final class Library {
      */
     public static void exit() {
         currentProc().exit();
+    }
+
+    /**
+     * @see Proc#link(Pid)
+     */
+    public static void link(Pid other) {
+        currentProc().link(other);
+    }
+
+    /**
+     * @see Proc#unlink(Pid)
+     */
+    public static void unlink(Pid other) {
+        currentProc().unlink(other);
     }
 }
