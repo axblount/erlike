@@ -19,6 +19,7 @@
 package erlike;
 
 import java.time.*;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.*;
 import org.slf4j.*;
@@ -26,19 +27,21 @@ import org.slf4j.*;
 /**
  * An Erlike process. This is a specialized thread with builtin functions
  * (i.e. protected final methods). User defined Procs will subclass this.
- *
- * It extends Thread because I am a wild man.
+ * <p>
+ * I extend Thread because I am a wild man.
+ * <p>
+ * TODO: Write an explanation of why extending thread is a Good Thing in this case.
  */
 public abstract class Proc extends Thread {
     private static final Logger log = LoggerFactory.getLogger(Proc.class);
 
     /** A unique exception used to signal that a Proc is exiting. */
-    private static final RuntimeException EXIT = new RuntimeException() {
+    private static final RuntimeException NORMAL_EXIT = new RuntimeException() {
         static final long serialVersionUID = 1L;
     };
 
     /** The {@link Node} this Proc is running on. */
-    private Node homeNode;
+    private Node node;
 
     /** The process id of this Proc. */
     private Pid pid;
@@ -46,43 +49,51 @@ public abstract class Proc extends Thread {
     /** The queue of incoming messages. */
     private Mailbox<Object> mailbox;
 
+    /** The set of linked Procs. Needs to be thread-safe. */
+    private Set<Pid> links;
+
     /**
      * Bind this Proc to a {@link Node}, establishing its identity.
      * This should be called exactly once.
      *
-     * @param homeNode The {@link Node} this Proc is running on.
+     * @param node The {@link Node} this Proc is running on.
      * @return Pid of the bound process.
      */
-    final Pid startInNode(final Node homeNode) {
-        if (homeNode == null)
+    final Pid startInNode(final Node node) {
+        if (node == null)
             throw new NullPointerException("Proc cannot be bound to null Node.");
         if (getState() != State.NEW)
             throw new IllegalStateException("Proc cannot be bound twice.");
 
-        this.homeNode = homeNode;
-        pid = new LocalPid(this.homeNode, getId());
+        this.node = node;
+        pid = new LocalPid(this.node, getId());
         mailbox = new Mailbox<>();
+        links = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
         setName(pid.toString());
-        setUncaughtExceptionHandler(this.homeNode);
+        setUncaughtExceptionHandler(this.node);
         start();
 
-        return this.pid;
+        return pid;
     }
 
     /**
      * User defined Procs provide behavior by overriding this method.
      *
-     * @throws Exception Procs are allowed to throw exceptions.
+     * @throws Exception Procs are not required to catch exceptions.
      */
     protected abstract void main() throws Exception;
 
     /**
      * Add mail to the mailbox.
      */
-
     final void addMail(Object msg) {
-        mailbox.offer(msg);
+        if (msg instanceof SystemMail)
+            // TODO In the future this will have to handle
+            // procs being configured to trap system mail.
+            ((SystemMail)msg).visit(this);
+        else
+            mailbox.offer(msg);
     }
 
     /**
@@ -91,28 +102,38 @@ public abstract class Proc extends Thread {
      */
     @Override
     public final void run() {
+        Throwable reason = NORMAL_EXIT;
         try {
             main();
         } catch (InterruptedException e) {
-            log.debug("{} interrupted.", pid, e);
+            log.debug("{} was interrupted.", pid, e);
+            reason = e;
         } catch (Exception e) {
-            if (e == EXIT)
+            if (e == NORMAL_EXIT) {
                 log.debug("{} exited.", pid);
-            else
-                log.warn("{} threw an unexpected exception.", pid, e);
+            } else {
+                reason = e;
+                node.uncaughtException(this, e);
+            }
         } finally {
-            homeNode.notifyExit(this);
+            notifyLinksAndMonitors(reason);
+            node.notifyExit(this);
         }
     }
 
     /**
-     * Check a piece of mail for any system action that needs to be taken.
-     *
-     * @param mail The mail to be checked.
+     * Notify if necessary all linked and monitoring processes that this process has exited.
+     * @param reason The reason this proc exited.
      */
-    private void checkMail(Object mail) {
-        if (mail instanceof SystemMail)
-            ((SystemMail)mail).visit(this);
+    private void notifyLinksAndMonitors(Throwable reason) {
+        Pid self = self();
+        if (reason != NORMAL_EXIT) {
+            // Only notify links if the exit wasn't normal.
+            log.debug("{} notifying links of abnormal exit.", self, reason);
+            links.forEach(pid ->
+                    pid.send(new SystemMail.LinkExit(self)));
+        }
+        // TODO: notify monitors
     }
 
     /*=====================*/
@@ -130,7 +151,7 @@ public abstract class Proc extends Thread {
      * @return The node this proc is running on.
      */
     public final Node node() {
-        return homeNode;
+        return node;
     }
 
     /**
@@ -164,7 +185,6 @@ public abstract class Proc extends Thread {
         if (mail == null && timeoutHandler != null) {
             timeoutHandler.run();
         } else if (mail != null) {
-            checkMail(mail);
             handler.accept(mail);
         }
     }
@@ -205,7 +225,38 @@ public abstract class Proc extends Thread {
      * Inside main, it has the same effect as {@code return}.
      */
     protected final void exit() {
-        throw EXIT;
+        throw NORMAL_EXIT;
+    }
+
+    /**
+     * Create a link between this and the target process.
+     * If a link already exists, this method has no
+     * effect.
+     *
+     * @param other The pid to link.
+     */
+    protected final void link(Pid other) {
+        links.add(other);
+        other.send(new SystemMail.Link(self()));
+    }
+
+    /**
+     * Destroy any link between this process and another.
+     * If no link exists, this method has no effect.
+     *
+     * @param other The pid to link.
+     */
+    protected final void unlink(Pid other) {
+        links.remove(other);
+        other.send(new SystemMail.Unlink(self()));
+    }
+
+    final void completeLink(Pid other) {
+        links.add(other);
+    }
+
+    final void completeUnlink(Pid other) {
+        links.remove(other);
     }
 }
 

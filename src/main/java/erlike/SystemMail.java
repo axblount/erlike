@@ -18,6 +18,75 @@
  */
 package erlike;
 
+/**
+ * Classes implementing SystemMail will be treated differently
+ * when received by processes.
+ */
 interface SystemMail {
-    public void visit(Proc proc);
+    /**
+     * Apply the effect of this system mail to a process.
+     * Subclasses should not rely on this being called inside
+     * of the Proc thread.
+     *
+     * @param proc The proc to visit.
+     */
+    public abstract void visit(Proc proc);
+
+    /**
+     * This represents system mail that has a sender process.
+     */
+    static abstract class SenderMail implements SystemMail {
+        private final Pid sender;
+
+        protected SenderMail(Pid sender) {
+            this.sender = sender;
+        }
+
+        public Pid getSender() {
+            return sender;
+        }
+    }
+
+    /**
+     * Sent to complete a link between two processes.
+     */
+    static class Link extends SenderMail {
+        public Link(Pid sender) {
+            super(sender);
+        }
+
+        @Override
+        public void visit(Proc proc) {
+            proc.completeLink(getSender());
+        }
+    }
+
+    /**
+     * Sent to complete a link between two processes.
+     */
+    static class Unlink extends SenderMail {
+        public Unlink(Pid sender) {
+            super(sender);
+        }
+
+        @Override
+        public void visit(Proc proc) {
+            proc.completeUnlink(getSender());
+        }
+    }
+
+    /**
+     * Sent to notify a proc that another has exited.
+     */
+    static class LinkExit extends SenderMail {
+        public LinkExit(Pid sender) {
+            super(sender);
+        }
+
+        @Override
+        public void visit(Proc proc) {
+            // TODO: set interrupt reason
+            proc.interrupt();
+        }
+    }
 }

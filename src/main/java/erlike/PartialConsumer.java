@@ -50,9 +50,6 @@ public class PartialConsumer implements Consumer<Object> {
     /** Create a new PartialConsumer that matches no objects. */
     public PartialConsumer() { clauses = new LinkedList<>(); }
 
-    /**
-     * TODO
-     */
     @Override
     public void accept(Object arg) {
         for (Clause<?> c : clauses) {

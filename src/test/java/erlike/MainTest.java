@@ -3,6 +3,7 @@ package erlike;
 import org.junit.*;
 import static erlike.Library.*;
 
+@Ignore
 public class MainTest {
     public static class TestProc extends Proc {
         private final String saying;
@@ -27,26 +28,10 @@ public class MainTest {
     }
 
     @Test
-    public void main() throws InterruptedException {
-        Node node = new Node("test");
-
-        Pid t = node.spawn(TestProc.class, "Sounds good!");
-        Pid what = node.spawn(() -> {
-            System.out.println("Anonymous baby!");
-            receive(o -> System.out.println("got: " + o));
-            exit();
-            System.out.println("This shouldn't print!");
-        });
-        t.send("Hello there.");
-        t.send(12345);
-        what.send("A SECRET");
-    }
-
-    @Test
     public void readmeExample() throws InterruptedException {
         Node test = new Node("test");
 
-        Pid p1 = test.spawn(() -> {
+        final Pid p1 = test.spawn(() -> {
             System.out.println("first process running as " + self());
             receive(msg ->
                     System.out.println("I got: " + msg));
