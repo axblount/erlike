@@ -169,7 +169,7 @@ public abstract class Proc extends Thread {
     protected final void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler)
       throws InterruptedException {
         if (handler == null)
-            throw new NullPointerException("recieve requires a non-null message handler.");
+            throw new NullPointerException("recieve requires a message handler.");
         if (timeout == null && timeoutHandler != null)
             throw new NullPointerException(
                     "receive requires a valid timeout if the timeoutHandler is not null");
@@ -217,6 +217,72 @@ public abstract class Proc extends Thread {
      */
     protected final void receive(Consumer<Object> handler)
       throws InterruptedException {
+        receive(handler, null, null);
+    }
+
+    /**
+     * Receive a message within the given timeout, otherwise run a timeout handler.
+     *
+     * @see #receive(Consumer, Duration)
+     * @see #receive(Consumer)
+     *
+     * @throws InterruptedException If the Proc is interrupted while waiting for mail.
+     *
+     * @param handler A consumer for the received message.
+     * @param timeout The duration to wait for a message.
+     * @param timeoutHandler The action to take if the receive times out.
+     */
+    protected final void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
+            throws InterruptedException {
+        if (handler == null)
+            throw new NullPointerException("recieve requires a message handler.");
+        if (timeout == null && timeoutHandler != null)
+            throw new NullPointerException(
+                    "receive requires a valid timeout if the timeoutHandler is not null");
+
+        Object mail;
+        if (timeout == null)
+            mail = mailbox.takeMatch(handler::isDefinedAt);
+        else if (timeout.toNanos() == 0)
+            mail = mailbox.pollMatch(handler::isDefinedAt);
+        else
+            mail = mailbox.pollMatch(handler::isDefinedAt, timeout.toMillis(), TimeUnit.MILLISECONDS);
+
+        if (mail == null && timeoutHandler != null) {
+            timeoutHandler.run();
+        } else if (mail != null) {
+            handler.accept(mail);
+        }
+    }
+
+    /**
+     * Receive mail within a timeout, taking no action if the timeout expires.
+     *
+     * @see #receive(Consumer, Duration, Runnable)
+     * @see #receive(Consumer)
+     *
+     * @throws InterruptedException If the Proc is interrupted while waiting for mail.
+     *
+     * @param handler A consumer for the received message.
+     * @param timeout The duration to wait for a message.
+     */
+    protected final void receive(PartialConsumer handler, Duration timeout)
+            throws InterruptedException {
+        receive(handler, timeout, null);
+    }
+
+    /**
+     * Receive mail, blocking indefinetly.
+     *
+     * @see #receive(Consumer, Duration, Runnable)
+     * @see #receive(Consumer, Duration)
+     *
+     * @throws InterruptedException If the Proc is interrupted while waiting for mail.
+     *
+     * @param handler A consumer for the received message.
+     */
+    protected final void receive(PartialConsumer handler)
+            throws InterruptedException {
         receive(handler, null, null);
     }
 
