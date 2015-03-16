@@ -1,4 +1,4 @@
-erlike
+Erlike
 ======
 
 ![version-ALPHA](http://img.shields.io/badge/version-ALPHA-green.svg?style=flat)
@@ -41,10 +41,19 @@ lock-free queue found at [1024cores][1]. You can find my implementation in
 [Mailbox][2]. I believe this is the same algorithm that [Akka][3] uses. If you 
 notice a problem with my version, please raise an issue!
 
+At the moment, the only external dependencies are JUnit and SLF4J.
+
+Features
+--------
+
+* Spawning processes.
+* Sending and receiving messages.
+* Creating links between processes.
+
 Future Milestones
 -----------------
 
-* Links and monitors
+* ~~Links~~ and monitors
 * Networking
   * This will be an excellent first opportunity for dogfooding.
 * Command-line interface
