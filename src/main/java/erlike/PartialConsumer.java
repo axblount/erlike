@@ -25,23 +25,42 @@ import java.util.function.Consumer;
 /**
  * A PartialConsumer is a Consumer that is only defined for certain types.
  */
-public class PartialConsumer implements Consumer<Object> {
-
+public class PartialConsumer {
+    /**
+     * A clause that matches instances of {@code T}.
+     * @param <T> The base type this clause matches.
+     */
     private static class Clause<T> {
-        private final Class<T> type;
-        private final Consumer<T> body;
+        protected final Class<T> type;
+        protected final Consumer<T> body;
 
         Clause(Class<T> type, Consumer<T> body) {
             this.type = type;
             this.body = body;
         }
 
-        public boolean matches(Object obj) {
-            return type.isInstance(obj);
+        public boolean matches(Object arg) {
+            return type.isInstance(arg);
         }
 
         public void accept(Object arg) {
             body.accept(type.cast(arg));
+        }
+    }
+
+    /**
+     * A clause that matches a type, but none of it's subtypes.
+     *
+     * @param <T> The exact type to match.
+     */
+    private static class ExactClause<T> extends Clause<T> {
+        ExactClause(Class<T> type, Consumer<T> body) {
+            super(type,body);
+        }
+
+        @Override
+        public boolean matches(Object arg) {
+            return type.equals(arg.getClass());
         }
     }
 
@@ -50,7 +69,6 @@ public class PartialConsumer implements Consumer<Object> {
     /** Create a new PartialConsumer that matches no objects. */
     public PartialConsumer() { clauses = new LinkedList<>(); }
 
-    @Override
     public void accept(Object arg) {
         for (Clause<?> c : clauses) {
             if (c.matches(arg)) {
@@ -84,7 +102,20 @@ public class PartialConsumer implements Consumer<Object> {
      * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
      */
     public <T> PartialConsumer match(Class<T> type, Consumer<T> body) {
-        clauses.add(new Clause<T>(type, body));
+        clauses.add(new Clause<>(type, body));
+        return this;
+    }
+
+    /**
+     * Add a clause to this PartialConsumer that matches a given type.
+     *
+     * @param <T> The type that this clause will match.
+     * @param type The Class object representing the type this clause will match.
+     * @param body The consumer that will handle objects of this type.
+     * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
+     */
+    public <T> PartialConsumer exactMatch(Class<T> type, Consumer<T> body) {
+        clauses.add(new ExactClause<>(type, body));
         return this;
     }
 

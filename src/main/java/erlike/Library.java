@@ -97,6 +97,30 @@ public final class Library {
     }
 
     /**
+     * @see Proc#receive(PartialConsumer, Duration, Runnable)
+     */
+    public static void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
+            throws InterruptedException {
+        currentProc().receive(handler, timeout, timeoutHandler);
+    }
+
+    /**
+     * @see Proc#receive(PartialConsumer, Duration)
+     */
+    public static void receive(PartialConsumer handler, Duration timeout)
+            throws InterruptedException {
+        receive(handler, timeout, null);
+    }
+
+    /**
+     * @see Proc#receive(PartialConsumer)
+     */
+    public static void receive(PartialConsumer handler)
+            throws InterruptedException {
+        receive(handler, null, null);
+    }
+
+    /**
      * @see Proc#exit()
      */
     public static void exit() {

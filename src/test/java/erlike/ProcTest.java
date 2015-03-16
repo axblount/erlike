@@ -19,6 +19,8 @@
 package erlike;
 
 import org.junit.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 
@@ -30,6 +32,7 @@ public class ProcTest {
         volatile boolean flag = false;
         void set() { flag = true; }
         boolean isSet() { return flag; }
+        void reset() { flag = false; }
     }
 
     @Test
@@ -78,10 +81,56 @@ public class ProcTest {
             continueFlag.set();
         });
 
-        Thread.sleep(200);
+        node.joinAll();
 
         assertFalse("success flag was set.", successFlag.isSet());
         assertTrue("timeout flag was not set.", timeoutFlag.isSet());
         assertTrue("continue flag was not set.", continueFlag.isSet());
+    }
+
+    @Test
+    public void patternReceiveTest() throws InterruptedException {
+        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "DEBUG");
+
+        class A {}
+        class B {}
+
+        Node node = new Node("patternReceiveTest");
+        final Flag aFlag = new Flag();
+        final Flag bFlag = new Flag();
+
+        Pid pid = node.spawn(() -> {
+            PartialConsumer handler = new PartialConsumer()
+                    .match(A.class, a ->
+                            aFlag.set())
+                    .match(B.class, b ->
+                            bFlag.set())
+                    .otherwise(obj -> exit());
+            while (true) {
+                receive(handler);
+            }
+        });
+
+        Thread.sleep(1000);
+
+        pid.send(new A());
+        Thread.sleep(100);
+        assertEquals("there were errors.", 0, node.getUncaughtExceptions().size());
+        assertTrue("A flag was not set.", aFlag.isSet());
+        assertFalse("B flag was set by A.", bFlag.isSet());
+        aFlag.reset();
+
+        pid.send(new B());
+        Thread.sleep(100);
+        assertEquals("there were errors.", 0, node.getUncaughtExceptions().size());
+        assertFalse("A flag was set by B.", aFlag.isSet());
+        assertTrue("B flag was not set.", bFlag.isSet());
+        bFlag.reset();
+
+        pid.send(new Object());
+        node.joinAll();
+        assertEquals("there were errors.", 0, node.getUncaughtExceptions().size());
+        assertFalse("A flag was set by an object.", aFlag.isSet());
+        assertFalse("B flag was set by a object.", bFlag.isSet());
     }
 }

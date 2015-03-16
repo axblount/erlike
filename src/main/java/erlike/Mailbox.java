@@ -243,6 +243,9 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
             // don't descent into a dead part of the queue.
             // This shouldn't cause a conflict if only one thread is
             // reading from the queue.
+            //
+            // We use cas instead of set to make sure that we don't
+            // overwrite an insert that happened just beforehand.
             prev.casNext(node, null);
         } else if (headAccess.compareAndSet(this, prev, node)) {
             // prev was the sentinel, now node is the sentinel
