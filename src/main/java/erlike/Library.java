@@ -30,7 +30,7 @@ import java.util.function.Consumer;
  * </p>
  * <p>
  * Calling any of these methods outside of a running Proc will cause
- * a {@link java.lang.RuntimeException}.
+ * a {@link java.lang.IllegalStateException}.
  * </p>
  */
 public final class Library {
