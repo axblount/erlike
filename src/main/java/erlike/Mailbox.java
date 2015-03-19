@@ -127,6 +127,11 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
     }
 
     @Override
+    public boolean remove(Object e) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public E element() {
         E result = peek();
         if (result == null)

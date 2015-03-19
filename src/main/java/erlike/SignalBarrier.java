@@ -74,14 +74,20 @@ public class SignalBarrier {
         // If a thread is attempting to await, the current owner should be null.
         if (!ownerAccess.compareAndSet(this, null, t)) {
             log.error("{} attempted to use a SignalBarrier already in use by {}", t, ownerAccess.get(this));
-            throw new IllegalStateException("A second thread tried to acquire a signal barrier is already owned.");
+            throw new IllegalStateException("A second thread tried to acquire a signal barrier that is already owned.");
         }
 
         // The current thread has taken ownership of this barrier.
-        // Park it until the signal.
+        // Park the current thread until the signal. Record this
+        // signal barrier as the 'blocker'.
         log.debug("SignalBarrier created and {} parked.", t);
         LockSupport.park(this);
-        ownerAccess.set(this, null);
+        // If a thread has called #signal() the owner should already be null.
+        // However the documentation for LockSupport.unpark makes it clear that
+        // threads can wake up for absolutely no reason. Do a compare and set
+        // to make sure we don't wipe out a new owner, keeping in mind that only
+        // thread should be awaiting at any given moment!
+        ownerAccess.compareAndSet(this, t, null);
         log.debug("SignalBarrier broken and {} unparked.", t);
 
         // Check to see if we've been unparked because of a thread interrupt.
@@ -122,7 +128,7 @@ public class SignalBarrier {
         // If a thread is attempting to await, the current owner should be null.
         if (!ownerAccess.compareAndSet(this, null, t)) {
             log.error("{} attempted to use a SignalBarrier already in use by {}", t, ownerAccess.get(this));
-            throw new IllegalStateException("A second thread tried to acquire a signal barrier is already owned.");
+            throw new IllegalStateException("A second thread tried to acquire a signal barrier that is already owned.");
         }
 
         // The current thread owns this barrier.
@@ -131,7 +137,7 @@ public class SignalBarrier {
         long start = System.nanoTime();
         log.debug("SignalBarrier created and {} parked.", t);
         LockSupport.parkNanos(this, timeout);
-        ownerAccess.set(this, null);
+        ownerAccess.compareAndSet(this, t, null);
         log.debug("SignalBarrier broken and {} unparked.", t);
         long stop = System.nanoTime();
 

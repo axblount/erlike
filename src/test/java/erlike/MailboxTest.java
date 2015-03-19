@@ -10,12 +10,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Future;
 
-public class MailboxTest {/*extends BlockingQueueTest {
+public class MailboxTest extends BlockingQueueTester {
     @Override
     public BlockingQueue emptyCollection() {
         return new Mailbox<Object>();
     }
-    */
+
+    @Override @Test @Ignore("N/A") public void testTimedPollWithOffer() { }
+    @Override @Test @Ignore("N/A") public void testRemoveElement() { }
 
     @Test
     public void singleThreadPoll() throws InterruptedException {

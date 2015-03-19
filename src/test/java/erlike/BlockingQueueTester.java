@@ -6,7 +6,7 @@
  * Other contributors include Andrew Wright, Jeffrey Hayes,
  * Pat Fisher, Mike Judd.
  *
- * Modified for this project.
+ * Modified for Erlike.
  */
 
 package erlike;
@@ -29,8 +29,7 @@ import static org.junit.Assert.*;
 /**
  * Contains "contract" tests applicable to all BlockingQueue implementations.
  */
-@Ignore
-public abstract class BlockingQueueTest {
+public abstract class BlockingQueueTester {
     /*
      * This is the start of an attempt to refactor the tests for the
      * various related implementations of related interfaces without
