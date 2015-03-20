@@ -66,7 +66,7 @@ public abstract class Proc extends Thread {
             throw new IllegalStateException("Proc cannot be bound twice.");
 
         this.node = node;
-        pid = new LocalPid(this.node, getId());
+        pid = new Pid(this.node.getRef(), getId());
         mailbox = new Mailbox<>();
         links = Collections.newSetFromMap(new ConcurrentHashMap<>());
 

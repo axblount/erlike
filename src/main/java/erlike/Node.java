@@ -18,6 +18,8 @@
  */
 package erlike;
 
+import java.io.ObjectOutputStream;
+import java.net.InetAddress;
 import java.util.*;
 import java.lang.reflect.*;
 import java.util.concurrent.*;
@@ -32,6 +34,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
     /** The name of the Node. */
     private final String name;
 
+    private final UUID uuid;
+
     /**
      * A map of procs by their thread ids.
      * @see Thread#getId()
@@ -43,6 +47,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
      */
     private final List<Throwable> uncaughtExceptions;
 
+    private final ConcurrentMap<Nid, ObjectOutputStream> nodes;
+
     /**
      * Create a new Node.
      *
@@ -50,9 +56,11 @@ public class Node implements Thread.UncaughtExceptionHandler {
      */
     public Node(String name) {
         this.name = name;
+        this.uuid = UUID.randomUUID();
         this.procs = new ConcurrentHashMap<>();
         this.uncaughtExceptions = Collections.synchronizedList(new LinkedList<>());
-        log.debug("Node starting: {}.", name);
+        this.nodes = new ConcurrentHashMap<>();
+        log.debug("Node starting: {} {}.", name, uuid);
     }
 
     /**
@@ -61,6 +69,10 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @return The Node's name.
      */
     public String getName() { return name; }
+
+    public UUID getUUID() { return uuid; }
+
+    public Nid getRef() { return new Nid(uuid, name, InetAddress.getLoopbackAddress()); }
 
     /**
      * Get all uncaughtExceptions. The caller is free to
@@ -92,17 +104,29 @@ public class Node implements Thread.UncaughtExceptionHandler {
         Proc proc = procs.get(procId);
         if (proc != null)
             proc.addMail(msg);
+        // TODO: dead letters
     }
 
     /**
      * Send a message to a {@link Proc} on another node.
      *
-     * @param nodeId The id of the target {@link Proc}'s node.
+     * @param nid A reference to the receiver {@link Node}.
      * @param procId The id of the target {@link Proc}.
      * @param msg The message to send.
      */
-    final void sendById(final int nodeId, final long procId, final Object msg) {
-        // TODO
+    final void sendById(final Nid nid, final long procId, final Object msg) {
+        if (nid.getUUID() == uuid) {
+            sendById(procId, msg);
+        } else {
+            ObjectOutputStream out = nodes.get(nid);
+            if (out != null) {
+                try {
+                    out.writeObject(new Envelope(procId, msg));
+                } catch (Exception e) {
+                    nodes.remove(nid);
+                }
+            } // else todo: dead letters
+        }
     }
 
     /**
@@ -285,8 +309,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * Used for testing only!!!
      */
     Proc unsafeGetProc(Pid pid) {
-        if (pid instanceof LocalPid) {
-            return procs.get(((LocalPid) pid).procId);
+        if (pid instanceof Pid) {
+            return procs.get(((Pid) pid).procId);
         }
         return null;
     }
@@ -302,5 +326,10 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public void uncaughtException(Thread t, Throwable e) {
         log.error("Node {} got an uncaught an exception from {}!!!", name, t, e);
         uncaughtExceptions.add(e);
+    }
+
+    void registerNode(Nid ref, ObjectOutputStream outputStream) {
+        nodes.put(ref, outputStream);
+        log.debug("New node {} registered with {}.", ref, name);
     }
 }

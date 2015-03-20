@@ -18,18 +18,36 @@
  */
 package erlike;
 
-/**
- * This interface represents the id of a process
- * somewhere within the given Erlike system.
- * The process may be local or remote.
- *
- * Implementations should override Object#equals(Object) and Object#toString().
- */
-public interface Pid {
-    /**
-     * Send a message to the process this points to.
-     * @param msg The message to send.
-     */
-    public void send(Object msg);
-}
+import java.io.Serializable;
 
+public final class Pid implements Serializable {
+    final Nid nid;
+    final long procId;
+
+    Pid(final Nid nid, final long procId) {
+        this.nid = nid;
+        this.procId = procId;
+    }
+
+    public Nid getNid() {
+        return nid;
+    }
+
+    public void send(Object msg) {
+        Library.node().sendById(nid, procId, msg);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (other instanceof Pid) {
+            Pid pid = (Pid)other;
+            return this.procId == pid.procId && this.nid == pid.nid;
+        }
+        return false;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s->%d", nid, procId);
+    }
+}

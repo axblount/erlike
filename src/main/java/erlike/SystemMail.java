@@ -18,11 +18,13 @@
  */
 package erlike;
 
+import java.io.Serializable;
+
 /**
  * Classes implementing SystemMail will be treated differently
  * when received by processes.
  */
-interface SystemMail {
+interface SystemMail extends Serializable {
     /**
      * Apply the effect of this system mail to a process.
      * Subclasses should not rely on this being called inside
