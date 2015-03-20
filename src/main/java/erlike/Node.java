@@ -309,9 +309,8 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * Used for testing only!!!
      */
     Proc unsafeGetProc(Pid pid) {
-        if (pid instanceof Pid) {
-            return procs.get(((Pid) pid).procId);
-        }
+        if (pid != null)
+            return procs.get(pid.getProcId());
         return null;
     }
 

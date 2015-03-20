@@ -73,26 +73,26 @@ public final class Library {
     }
 
     /**
-     * @see Proc#receive(Consumer, Duration, Runnable)
+     * @see Proc#receive(Lambda.One, Duration, Runnable)
      */
-    public static void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler)
-            throws InterruptedException {
+    public static void receive(Lambda.One<Object> handler, Duration timeout, Runnable timeoutHandler)
+            throws Exception {
         currentProc().receive(handler, timeout, timeoutHandler);
     }
 
     /**
-     * @see Proc#receive(Consumer, Duration)
+     * @see Proc#receive(Lambda.One, Duration)
      */
-    public static void receive(Consumer<Object> handler, Duration timeout)
-            throws InterruptedException {
+    public static void receive(Lambda.One<Object> handler, Duration timeout)
+            throws Exception {
         receive(handler, timeout, null);
     }
 
     /**
-     * @see Proc#receive(Consumer)
+     * @see Proc#receive(Lambda.One)
      */
-    public static void receive(Consumer<Object> handler)
-            throws InterruptedException {
+    public static void receive(Lambda.One<Object> handler)
+            throws Exception {
         receive(handler, null, null);
     }
 

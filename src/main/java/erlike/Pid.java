@@ -21,12 +21,16 @@ package erlike;
 import java.io.Serializable;
 
 public final class Pid implements Serializable {
-    final Nid nid;
-    final long procId;
+    private final Nid nid;
+    private final long procId;
 
     Pid(final Nid nid, final long procId) {
         this.nid = nid;
         this.procId = procId;
+    }
+
+    long getProcId() {
+        return procId;
     }
 
     public Nid getNid() {

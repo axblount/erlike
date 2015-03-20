@@ -166,8 +166,8 @@ public abstract class Proc extends Thread {
      * @param timeout The duration to wait for a message.
      * @param timeoutHandler The action to take if the receive times out.
      */
-    protected final void receive(Consumer<Object> handler, Duration timeout, Runnable timeoutHandler)
-      throws InterruptedException {
+    protected final void receive(Lambda.One<Object> handler, Duration timeout, Runnable timeoutHandler)
+      throws Exception {
         if (handler == null)
             throw new NullPointerException("recieve requires a message handler.");
         if (timeout == null && timeoutHandler != null)
@@ -200,8 +200,8 @@ public abstract class Proc extends Thread {
      * @param handler A consumer for the received message.
      * @param timeout The duration to wait for a message.
      */
-    protected final void receive(Consumer<Object> handler, Duration timeout)
-      throws InterruptedException {
+    protected final void receive(Lambda.One<Object> handler, Duration timeout)
+      throws Exception {
         receive(handler, timeout, null);
     }
 
@@ -215,8 +215,8 @@ public abstract class Proc extends Thread {
      *
      * @param handler A consumer for the received message.
      */
-    protected final void receive(Consumer<Object> handler)
-      throws InterruptedException {
+    protected final void receive(Lambda.One<Object> handler)
+      throws Exception {
         receive(handler, null, null);
     }
 

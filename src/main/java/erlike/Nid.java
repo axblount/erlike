@@ -4,23 +4,15 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.util.UUID;
 
-public class Nid implements Serializable {
-    private final UUID uuid;
-    private final String name;
+public final class Nid implements Serializable {
+    public final UUID uuid;
+    public final String name;
     private transient InetAddress address;
 
     Nid(UUID uuid, String name, InetAddress address) {
         this.uuid = uuid;
         this.name = name;
         this.address = address;
-    }
-
-    public UUID getUUID() {
-        return uuid;
-    }
-
-    public String getName() {
-        return name;
     }
 
     public InetAddress getAddress() {

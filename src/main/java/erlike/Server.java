@@ -1,38 +1,40 @@
 package erlike;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import org.slf4j.*;
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketAddress;
+import java.net.*;
+import java.util.concurrent.*;
+
+import static erlike.Library.*;
 
 // todo: need a process that will connect to new nodes
 // when the parent node asks.
-class Server extends Proc {
+class Server {
     private static final Logger log = LoggerFactory.getLogger(Server.class);
 
+    private Node node;
     private ServerSocket serverSocket;
+    private ConcurrentMap<Nid, Socket> connections;
 
-    Server(SocketAddress addr) throws IOException {
+    Server(Node node, SocketAddress addr) throws IOException {
+        this.node = node;
         serverSocket = new ServerSocket();
         serverSocket.setReuseAddress(true);
         serverSocket.bind(addr);
+        connections = new ConcurrentHashMap<>();
     }
 
-    @Override
-    protected void main() throws Exception {
+    private void listener() throws Exception {
         try {
             while (!serverSocket.isClosed()) {
                 Socket socket = serverSocket.accept();
                 ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
                 ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
 
-                Nid ref;
+                Nid nid;
                 try {
-                    ref = (Nid) inputStream.readObject();
-                    outputStream.writeObject(node().getRef());
+                    nid = (Nid) inputStream.readObject();
+                    outputStream.writeObject(node.getRef());
                 } catch (Exception e) {
                     log.error("Failed to confirm connection with new node at {}.",
                             socket.getInetAddress(), e);
@@ -44,12 +46,29 @@ class Server extends Proc {
                     }
                 }
 
-                ref.setAddress(socket.getInetAddress());
-                node().registerNode(ref, outputStream);
-                node().spawn(this::handleInput, inputStream);
+                nid.setAddress(socket.getInetAddress());
+                node.registerNode(nid, outputStream);
+                node.spawn(this::handleInput, inputStream);
             }
         } finally {
             serverSocket.close();
+        }
+    }
+
+    private void handleOutput() throws Exception {
+        while (true) {
+            receive(obj -> {
+                if (obj instanceof Envelope) {
+                    Envelope env = (Envelope)obj;
+                    Socket socket = connections.get(env.pid.getNid());
+                    if (socket == null)
+                        return; // TODO: retry connection!
+                    if (!(socket.isClosed() || socket.isOutputShutdown())) {
+                        ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
+                        outputStream.writeObject(env);
+                    }
+                } // else ignore it
+            });
         }
     }
 
@@ -58,7 +77,7 @@ class Server extends Proc {
             while (true) {
                 try {
                     Envelope input = (Envelope) inputStream.readObject();
-                    node().sendById(input.procId, input.message);
+                    node.sendById(input.pid, input.message);
                 } catch (EOFException e) {
                     return;
                 } catch (ClassNotFoundException e) {
@@ -69,6 +88,36 @@ class Server extends Proc {
             }
         } finally {
             inputStream.close();
+        }
+    }
+
+    public Nid connect(URL url) throws IOException {
+        InetAddress address = InetAddress.getByName(url.getHost());
+        int port = url.getPort();
+        if (port == -1) {
+            if (!url.getProtocol().equals("erlike"))
+                port = 13331;
+            else
+                port = url.getDefaultPort();
+        }
+        Socket socket = null;
+        try {
+            socket = new Socket(address, port);
+
+            ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
+            ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
+
+            outputStream.writeObject(node.getRef());
+            Nid nid = (Nid) inputStream.readObject();
+
+            node.spawn(this::handleInput, inputStream);
+
+            node.registerNode(nid, outputStream);
+
+            return nid;
+        } catch (Exception e) {
+            if (socket != null)
+                socket.close();
         }
     }
 }

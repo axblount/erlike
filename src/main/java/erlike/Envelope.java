@@ -3,11 +3,11 @@ package erlike;
 import java.io.Serializable;
 
 class Envelope implements Serializable {
-    public final long procId;
+    public final Pid pid;
     public final Object message;
 
-    public Envelope(long procId, Object message) {
-        this.procId = procId;
+    public Envelope(Pid pid, Object message) {
+        this.pid = pid;
         this.message = message;
     }
 }
