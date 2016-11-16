@@ -66,7 +66,7 @@ public abstract class Proc extends Thread {
             throw new IllegalStateException("Proc cannot be bound twice.");
 
         this.node = node;
-        pid = new Pid(this.node.getRef(), getId());
+        pid = new Pid(this.node, getId());
         mailbox = new Mailbox<>();
         links = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -157,8 +157,8 @@ public abstract class Proc extends Thread {
     /**
      * Receive a message within the given timeout, otherwise run a timeout handler.
      *
-     * @see #receive(Consumer, Duration)
-     * @see #receive(Consumer)
+     * @see #receive(Lambda.One, Duration)
+     * @see #receive(Lambda.One)
      *
      * @throws InterruptedException If the Proc is interrupted while waiting for mail.
      *
@@ -192,8 +192,8 @@ public abstract class Proc extends Thread {
     /**
      * Receive mail within a timeout, taking no action if the timeout expires.
      *
-     * @see #receive(Consumer, Duration, Runnable)
-     * @see #receive(Consumer)
+     * @see #receive(Lambda.One, Duration, Runnable)
+     * @see #receive(Lambda.One)
      *
      * @throws InterruptedException If the Proc is interrupted while waiting for mail.
      *
@@ -208,8 +208,8 @@ public abstract class Proc extends Thread {
     /**
      * Receive mail, blocking indefinetly.
      *
-     * @see #receive(Consumer, Duration, Runnable)
-     * @see #receive(Consumer, Duration)
+     * @see #receive(Lambda.One, Duration, Runnable)
+     * @see #receive(Lambda.One, Duration)
      *
      * @throws InterruptedException If the Proc is interrupted while waiting for mail.
      *
@@ -223,8 +223,8 @@ public abstract class Proc extends Thread {
     /**
      * Receive a message within the given timeout, otherwise run a timeout handler.
      *
-     * @see #receive(Consumer, Duration)
-     * @see #receive(Consumer)
+     * @see #receive(Lambda.One, Duration)
+     * @see #receive(Lambda.One)
      *
      * @throws InterruptedException If the Proc is interrupted while waiting for mail.
      *
@@ -258,8 +258,8 @@ public abstract class Proc extends Thread {
     /**
      * Receive mail within a timeout, taking no action if the timeout expires.
      *
-     * @see #receive(Consumer, Duration, Runnable)
-     * @see #receive(Consumer)
+     * @see #receive(Lambda.One, Duration, Runnable)
+     * @see #receive(Lambda.One)
      *
      * @throws InterruptedException If the Proc is interrupted while waiting for mail.
      *
@@ -274,8 +274,8 @@ public abstract class Proc extends Thread {
     /**
      * Receive mail, blocking indefinetly.
      *
-     * @see #receive(Consumer, Duration, Runnable)
-     * @see #receive(Consumer, Duration)
+     * @see #receive(Lambda.One, Duration, Runnable)
+     * @see #receive(Lambda.One, Duration)
      *
      * @throws InterruptedException If the Proc is interrupted while waiting for mail.
      *

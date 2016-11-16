@@ -45,7 +45,7 @@ public class LinkTest {
             last = node.spawn(pid -> {
                 link(pid);
                 Thread.sleep(2000);
-                System.out.println("Link chain should die before this prints!");
+                fail("Link chain did not terminate.");
             }, last);
         }
 
@@ -77,7 +77,7 @@ public class LinkTest {
         Pid watcher = node.spawn(() -> {
             receive(obj -> exit(),
                     ofMillis(1000),
-                    () -> fail("The link killed the other process"));
+                    () -> fail("The link killed the other process."));
         });
 
         node.spawn(() -> {

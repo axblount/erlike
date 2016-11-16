@@ -18,8 +18,11 @@
  */
 package erlike;
 
+import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.*;
 import java.lang.reflect.*;
 import java.util.concurrent.*;
@@ -47,7 +50,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
      */
     private final List<Throwable> uncaughtExceptions;
 
-    private final ConcurrentMap<Nid, ObjectOutputStream> nodes;
+    private final Server server;
 
     /**
      * Create a new Node.
@@ -59,8 +62,13 @@ public class Node implements Thread.UncaughtExceptionHandler {
         this.uuid = UUID.randomUUID();
         this.procs = new ConcurrentHashMap<>();
         this.uncaughtExceptions = Collections.synchronizedList(new LinkedList<>());
-        this.nodes = new ConcurrentHashMap<>();
         log.debug("Node starting: {} {}.", name, uuid);
+        try {
+            this.server = new Server(this, new InetSocketAddress(13331));
+        } catch (IOException e) {
+            log.error("Couldn't start server.", e);
+            throw new RuntimeException("Couldn't start Node server", e);
+        }
     }
 
     /**
@@ -72,7 +80,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
 
     public UUID getUUID() { return uuid; }
 
-    public Nid getRef() { return new Nid(uuid, name, InetAddress.getLoopbackAddress()); }
+    public Nid getRef() { return new Nid(this); }
 
     /**
      * Get all uncaughtExceptions. The caller is free to
@@ -95,37 +103,20 @@ public class Node implements Thread.UncaughtExceptionHandler {
     }
 
     /**
-     * Send a message to a {@link Proc} on this node.
-     *
-     * @param procId The id of the target {@link Proc}.
-     * @param msg The message to send.
-     */
-    final void sendById(final long procId, final Object msg) {
-        Proc proc = procs.get(procId);
-        if (proc != null)
-            proc.addMail(msg);
-        // TODO: dead letters
-    }
-
-    /**
      * Send a message to a {@link Proc} on another node.
      *
-     * @param nid A reference to the receiver {@link Node}.
-     * @param procId The id of the target {@link Proc}.
+     * @param pid The pid of the target {@link Proc}.
      * @param msg The message to send.
      */
-    final void sendById(final Nid nid, final long procId, final Object msg) {
-        if (nid.getUUID() == uuid) {
-            sendById(procId, msg);
+    // todo: dead letters
+    final void send(final Pid pid, final Object msg) {
+        Nid nid = pid.getNid();
+        if (nid.uuid == uuid) {
+            Proc proc = procs.get(pid.getProcId());
+            if (proc != null)
+                proc.addMail(msg);
         } else {
-            ObjectOutputStream out = nodes.get(nid);
-            if (out != null) {
-                try {
-                    out.writeObject(new Envelope(procId, msg));
-                } catch (Exception e) {
-                    nodes.remove(nid);
-                }
-            } // else todo: dead letters
+            server.sendOutgoingMail(pid, msg);
         }
     }
 
@@ -148,17 +139,17 @@ public class Node implements Thread.UncaughtExceptionHandler {
             Constructor<? extends Proc> ctor = procType.getConstructor(ctorTypes);
             proc = ctor.newInstance(args);
         } catch (NoSuchMethodException e) {
-            log.warn("No matching constructor found for {}.", procType, e);
+            log.error("No matching constructor found for {}.", procType, e);
             throw new RuntimeException("No constructor with that signature found.");
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
-            log.warn("The constructor for {} threw an exception.", procType, cause);
+            log.error("The constructor for {} threw an exception.", procType, cause);
             throw new RuntimeException("Proc constructor threw an error.", cause);
         } catch (InstantiationException e) {
-            log.warn("Could not call constructor for {}.", procType, e);
+            log.error("Could not call constructor for {}.", procType, e);
             throw new RuntimeException("Couldn't call constructor. Is the proc abstract?");
         } catch (Exception e) {
-            log.warn("Couldn't constructor proc of type {}.", procType, e);
+            log.error("Couldn't constructor proc of type {}.", procType, e);
             throw new RuntimeException("Couldn't spawn proc.", e);
         }
 
@@ -325,10 +316,5 @@ public class Node implements Thread.UncaughtExceptionHandler {
     public void uncaughtException(Thread t, Throwable e) {
         log.error("Node {} got an uncaught an exception from {}!!!", name, t, e);
         uncaughtExceptions.add(e);
-    }
-
-    void registerNode(Nid ref, ObjectOutputStream outputStream) {
-        nodes.put(ref, outputStream);
-        log.debug("New node {} registered with {}.", ref, name);
     }
 }

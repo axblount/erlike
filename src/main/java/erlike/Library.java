@@ -20,7 +20,6 @@ package erlike;
 
 import org.slf4j.*;
 import java.time.Duration;
-import java.util.function.Consumer;
 
 /**
  * <p>

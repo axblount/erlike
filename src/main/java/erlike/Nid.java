@@ -9,14 +9,10 @@ public final class Nid implements Serializable {
     public final String name;
     private transient InetAddress address;
 
-    Nid(UUID uuid, String name, InetAddress address) {
-        this.uuid = uuid;
-        this.name = name;
-        this.address = address;
-    }
-
-    public InetAddress getAddress() {
-        return address;
+    Nid(Node node) {
+        this.uuid = node.getUUID();
+        this.name = node.getName();
+        this.address = InetAddress.getLoopbackAddress();
     }
 
     void setAddress(InetAddress address) {

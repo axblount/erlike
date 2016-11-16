@@ -18,14 +18,18 @@
  */
 package erlike;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 
 public final class Pid implements Serializable {
+    private transient Node ctxNode;
     private final Nid nid;
     private final long procId;
 
-    Pid(final Nid nid, final long procId) {
-        this.nid = nid;
+    Pid(Node ctxNode, long procId) {
+        this.ctxNode = ctxNode;
+        this.nid = ctxNode.getRef();
         this.procId = procId;
     }
 
@@ -38,7 +42,7 @@ public final class Pid implements Serializable {
     }
 
     public void send(Object msg) {
-        Library.node().sendById(nid, procId, msg);
+        ctxNode.send(this, msg);
     }
 
     @Override
@@ -53,5 +57,18 @@ public final class Pid implements Serializable {
     @Override
     public String toString() {
         return String.format("%s->%d", nid, procId);
+    }
+
+    /**
+     * Custom deserialization
+     */
+    private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
+        stream.defaultReadObject();
+        /*
+        Set the node that deserialized this Pid as the
+        context Node.
+         */
+        // FIXME: This requires that Pids be serialized inside a Proc.
+        ctxNode = Library.node();
     }
 }

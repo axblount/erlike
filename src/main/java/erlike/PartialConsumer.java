@@ -25,16 +25,16 @@ import java.util.function.Consumer;
 /**
  * A PartialConsumer is a Consumer that is only defined for certain types.
  */
-public class PartialConsumer {
+public class PartialConsumer implements Lambda.One<Object> {
     /**
      * A clause that matches instances of {@code T}.
      * @param <T> The base type this clause matches.
      */
     private static class Clause<T> {
         protected final Class<T> type;
-        protected final Consumer<T> body;
+        protected final Lambda.One<T> body;
 
-        Clause(Class<T> type, Consumer<T> body) {
+        Clause(Class<T> type, Lambda.One<T> body) {
             this.type = type;
             this.body = body;
         }
@@ -43,7 +43,7 @@ public class PartialConsumer {
             return type.isInstance(arg);
         }
 
-        public void accept(Object arg) {
+        public void accept(Object arg) throws Exception {
             body.accept(type.cast(arg));
         }
     }
@@ -54,7 +54,7 @@ public class PartialConsumer {
      * @param <T> The exact type to match.
      */
     private static class ExactClause<T> extends Clause<T> {
-        ExactClause(Class<T> type, Consumer<T> body) {
+        ExactClause(Class<T> type, Lambda.One<T> body) {
             super(type,body);
         }
 
@@ -69,7 +69,7 @@ public class PartialConsumer {
     /** Create a new PartialConsumer that matches no objects. */
     public PartialConsumer() { clauses = new LinkedList<>(); }
 
-    public void accept(Object arg) {
+    public void accept(Object arg) throws Exception {
         for (Clause<?> c : clauses) {
             if (c.matches(arg)) {
                 c.accept(arg);
@@ -101,7 +101,7 @@ public class PartialConsumer {
      * @param body The consumer that will handle objects of this type.
      * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
      */
-    public <T> PartialConsumer match(Class<T> type, Consumer<T> body) {
+    public <T> PartialConsumer match(Class<T> type, Lambda.One<T> body) {
         clauses.add(new Clause<>(type, body));
         return this;
     }
@@ -114,7 +114,7 @@ public class PartialConsumer {
      * @param body The consumer that will handle objects of this type.
      * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
      */
-    public <T> PartialConsumer exactMatch(Class<T> type, Consumer<T> body) {
+    public <T> PartialConsumer exactMatch(Class<T> type, Lambda.One<T> body) {
         clauses.add(new ExactClause<>(type, body));
         return this;
     }
@@ -126,7 +126,7 @@ public class PartialConsumer {
      * @param body The consumer that will handle any object.
      * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
      */
-    public PartialConsumer otherwise(Consumer<Object> body) {
+    public PartialConsumer otherwise(Lambda.One<Object> body) {
         return match(Object.class, body);
     }
 }
