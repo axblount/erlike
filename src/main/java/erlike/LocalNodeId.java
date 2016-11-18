@@ -1,7 +1,8 @@
 package erlike;
 
 /**
- * Created by alex on 11/17/16.
+ * This is a {@link NodeId} that represents a {@link Node} running
+ * on this JVM.
  */
 class LocalNodeId implements NodeId {
     private final Node node;

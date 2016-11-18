@@ -23,6 +23,8 @@ import java.util.function.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 
+import org.jetbrains.annotations.*;
+
 /**
  * Unbounded MPSC lock-free queue with blocking calls. Hopefully this works.
  * <p>
@@ -46,7 +48,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
         private static final AtomicReferenceFieldUpdater<Node, Node> nextAccess =
                 AtomicReferenceFieldUpdater.newUpdater(Node.class, Node.class, "volatileNext");
 
-        public Node(E item, Node<E> next) {
+        public Node(@NotNull E item, Node<E> next) {
             this.item = item;
             this.volatileNext = next;
         }
@@ -86,6 +88,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
     }
 
     @Override
+    @Contract("null -> fail; _ -> true")
     public boolean offer(E e) {
         if (e == null)
             throw new NullPointerException();
@@ -127,6 +130,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
     }
 
     @Override
+    @Contract("_ -> fail")
     public boolean remove(Object e) {
         throw new UnsupportedOperationException();
     }

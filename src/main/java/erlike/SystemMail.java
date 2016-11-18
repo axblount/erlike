@@ -20,6 +20,8 @@ package erlike;
 
 import java.io.Serializable;
 
+import org.jetbrains.annotations.NotNull;
+
 /**
  * Classes implementing SystemMail will be treated differently
  * when received by processes.
@@ -32,7 +34,7 @@ interface SystemMail extends Serializable {
      *
      * @param proc The proc to visit.
      */
-    void visit(Proc proc);
+    void visit(@NotNull final Proc proc);
 
     /**
      * This represents system mail that has a sender process.

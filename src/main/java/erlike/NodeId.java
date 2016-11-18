@@ -1,7 +1,8 @@
 package erlike;
 
 /**
- * Created by alex on 11/17/16.
+ * All references to {@link Node}s are handled transparently through this class.
+ * It does not matter if it's the current Node or one running on another server.
  */
 public interface NodeId {
     ProcId spawn(Class<? extends Proc> procType, Object... args);

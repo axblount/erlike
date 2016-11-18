@@ -1,7 +1,8 @@
 package erlike;
 
 /**
- * Created by alex on 11/17/16.
+ * This is a {@link ProcId} that represents a {@link Proc} running
+ * on this JVM.
  */
 class LocalProcId implements ProcId {
     private final Proc proc;

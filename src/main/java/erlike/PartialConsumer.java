@@ -20,7 +20,8 @@ package erlike;
 
 import java.util.List;
 import java.util.LinkedList;
-import java.util.function.Consumer;
+
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A PartialConsumer is a Consumer that is only defined for certain types.
@@ -34,16 +35,16 @@ public class PartialConsumer implements Lambda.One<Object> {
         protected final Class<T> type;
         protected final Lambda.One<T> body;
 
-        Clause(Class<T> type, Lambda.One<T> body) {
+        Clause(@NotNull Class<T> type, @NotNull Lambda.One<T> body) {
             this.type = type;
             this.body = body;
         }
 
-        public boolean matches(Object arg) {
+        public boolean matches(@NotNull Object arg) {
             return type.isInstance(arg);
         }
 
-        public void accept(Object arg) throws Exception {
+        public void accept(@NotNull Object arg) throws Exception {
             body.accept(type.cast(arg));
         }
     }
@@ -69,7 +70,7 @@ public class PartialConsumer implements Lambda.One<Object> {
     /** Create a new PartialConsumer that matches no objects. */
     public PartialConsumer() { clauses = new LinkedList<>(); }
 
-    public void accept(Object arg) throws Exception {
+    public void accept(@NotNull Object arg) throws Exception {
         for (Clause<?> c : clauses) {
             if (c.matches(arg)) {
                 c.accept(arg);

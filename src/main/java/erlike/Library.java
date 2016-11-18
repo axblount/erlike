@@ -24,15 +24,12 @@ import java.util.Random;
 import java.util.function.Consumer;
 
 /**
- * <p>
- * This class is statically imported to access builtin Proc functions
- * ({@link Proc#node()}, {@link Proc#self()}, etc.) in anonymous procs.
+ * This class is statically imported to access builtin {@link Proc} functions
+ * ({@link Proc#node()}, {@link Proc#self()}, etc.) in anonymous Procs.
  * See the library methods in Proc for their usage.
- * </p>
  * <p>
  * Calling any of these methods outside of a running Proc will cause
  * a {@link java.lang.IllegalStateException}.
- * </p>
  */
 public final class Library {
     private static final Logger log = LoggerFactory.getLogger(Library.class);
@@ -53,7 +50,7 @@ public final class Library {
             return (Proc)t;
         } else {
             log.error("Non-Proc thread {} attempted to use Erlike Library.", t);
-            throw new IllegalStateException("Cannot call Proc Library functions from outside a Proc");
+            throw new IllegalStateException("Cannot call Proc Library functions from outside a Proc.");
         }
     }
 

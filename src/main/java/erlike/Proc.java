@@ -21,6 +21,7 @@ package erlike;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import org.jetbrains.annotations.*;
 import org.slf4j.*;
 
 /**
@@ -46,12 +47,15 @@ public abstract class Proc extends Thread {
     };
 
     /** The {@link Node} for this Proc. */
+    @NotNull
     private final Node node;
 
     /** The process id ({@link ProcId}) of this Proc. */
+    @NotNull
     private final ProcId selfId;
 
     /** The queue of incoming messages. Messages can be of any type. */
+    @NotNull
     private final Mailbox<Object> mailbox;
 
     /**
@@ -62,12 +66,13 @@ public abstract class Proc extends Thread {
      * @see #completeLink(ProcId)
      * @see #completeUnlink(ProcId)
      */
+    @NotNull
     private final Set<ProcId> links;
 
     /**
      * @param node The {@link Node} this Proc is running on.
      */
-    public Proc(Node node) {
+    public Proc(@NotNull final Node node) {
         super(node, "");
 
         if (node == null)
@@ -91,7 +96,7 @@ public abstract class Proc extends Thread {
     /**
      * Add mail to the mailbox.
      */
-    final void addMail(Object msg) {
+    final void addMail(@NotNull final Object msg) {
         if (msg instanceof SystemMail)
             // TODO In the future this will have to handle
             // procs being configured to trap system mail.
@@ -103,7 +108,7 @@ public abstract class Proc extends Thread {
 
     /**
      * Run this Proc. Thread related exceptions are handled.
-     * The parent {@link Node} is notified when the proc quits.
+     * The parent {@link Node} is notified when the Proc quits.
      */
     @Override
     public final void run() {
@@ -128,6 +133,7 @@ public abstract class Proc extends Thread {
 
     /**
      * Notify if necessary all linked and monitoring processes that this process has exited.
+     *
      * @param reason The reason this proc exited.
      */
     private void notifyLinksAndMonitors(Throwable reason) {
@@ -148,6 +154,8 @@ public abstract class Proc extends Thread {
     /**
      * @return The {@link ProcId} of this Proc.
      */
+    @Contract(pure = true)
+    @NotNull
     public final ProcId self() {
         return this.selfId;
     }
@@ -155,8 +163,9 @@ public abstract class Proc extends Thread {
     /**
      * @return The node this proc is running on.
      */
+    @NotNull
     public final NodeId node() {
-        return new LocalNodeId(node);
+        return node.getRef();
     }
 
     /**
@@ -171,7 +180,8 @@ public abstract class Proc extends Thread {
      * @param timeout The duration to wait for a message.
      * @param timeoutHandler The action to take if the receive times out.
      */
-    protected final void receive(Lambda.One<Object> handler, Duration timeout, Runnable timeoutHandler)
+    @Contract("!null, null, !null -> fail")
+    protected final void receive(@NotNull Lambda.One<Object> handler, Duration timeout, Runnable timeoutHandler)
       throws Exception {
         if (handler == null)
             throw new NullPointerException("recieve requires a message handler.");
@@ -205,7 +215,7 @@ public abstract class Proc extends Thread {
      * @param handler A consumer for the received message.
      * @param timeout The duration to wait for a message.
      */
-    protected final void receive(Lambda.One<Object> handler, Duration timeout)
+    protected final void receive(@NotNull Lambda.One<Object> handler, Duration timeout)
       throws Exception {
         receive(handler, timeout, null);
     }
@@ -220,7 +230,7 @@ public abstract class Proc extends Thread {
      *
      * @param handler A consumer for the received message.
      */
-    protected final void receive(Lambda.One<Object> handler)
+    protected final void receive(@NotNull Lambda.One<Object> handler)
       throws Exception {
         receive(handler, null, null);
     }
@@ -237,7 +247,8 @@ public abstract class Proc extends Thread {
      * @param timeout The duration to wait for a message.
      * @param timeoutHandler The action to take if the receive times out.
      */
-    protected final void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
+    @Contract("!null, null, !null -> fail")
+    protected final void receive(@NotNull PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
             throws Exception {
         if (handler == null)
             throw new NullPointerException("recieve requires a message handler.");
@@ -271,7 +282,7 @@ public abstract class Proc extends Thread {
      * @param handler A consumer for the received message.
      * @param timeout The duration to wait for a message.
      */
-    protected final void receive(PartialConsumer handler, Duration timeout)
+    protected final void receive(@NotNull PartialConsumer handler, Duration timeout)
             throws Exception {
         receive(handler, timeout, null);
     }
@@ -286,6 +297,7 @@ public abstract class Proc extends Thread {
      *
      * @param handler A consumer for the received message.
      */
+    @Contract("null -> fail")
     protected final void receive(PartialConsumer handler)
             throws Exception {
         receive(handler, null, null);
@@ -293,22 +305,22 @@ public abstract class Proc extends Thread {
 
     /**
      * Exit the Proc immediately. This can be used to return from inside of lambdas.
-     * Inside main, it has the same effect as {@code return}.
+     * Inside of {@link #main()}, it has the same effect as {@code return;}.
      */
+    @Contract(" -> fail")
     protected final void exit() {
         throw NORMAL_EXIT;
     }
 
     /**
-     * Create a link between this and the target process.
+     * Create a link between this and the target Proc.
      * If a link already exists, this method has no
      * effect.
      *
-     * @param other The selfId to link.
+     * @param other The {@link ProcId} of the Proc to be linked.
      */
-    // TODO: Add logging to all link methods.
     protected final void link(ProcId other) {
-        links.add(other);
+        completeLink(other);
         other.send(new SystemMail.Link(selfId));
     }
 
@@ -316,18 +328,20 @@ public abstract class Proc extends Thread {
      * Destroy any link between this process and another.
      * If no link exists, this method has no effect.
      *
-     * @param other The selfId to link.
+     * @param other The {@link ProcId} of the Proc to be unlinked.
      */
     protected final void unlink(ProcId other) {
-        links.remove(other);
+        completeUnlink(other);
         other.send(new SystemMail.Unlink(selfId));
     }
 
     final void completeLink(ProcId other) {
+        log.debug("Linked {} and {}.", this, other);
         links.add(other);
     }
 
     final void completeUnlink(ProcId other) {
+        log.debug("Unlinked {} and {}.", this, other);
         links.remove(other);
     }
 }

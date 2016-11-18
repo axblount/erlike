@@ -21,15 +21,20 @@ package erlike;
 import java.util.*;
 import java.lang.reflect.*;
 import java.util.concurrent.*;
+
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.*;
 
 /**
  * A Node represents a group of {@link Proc}s. The node keeps track of all running
  * {@link Proc}s and managing communication with other Nodes. In plain ol' Java terms:
+ * <p>
  * <code>
  *     {@link Node} : {@link ThreadGroup} :: {@link Proc} : {@link Thread}
  * </code>
- *
+ * <p>
  * Node objects should only be handled at the top-level of your program. Inside of {@link Proc}s
  * Nodes should be referenced by {@link NodeId}s. You can get the {@link NodeId} for a Node with
  * {@link #getRef()}.
@@ -40,17 +45,20 @@ import org.slf4j.*;
 public class Node extends ThreadGroup {
     private static final Logger log = LoggerFactory.getLogger(Node.class);
 
+    @NotNull
     private final NodeId selfId;
 
     /**
      * A map of procs by their thread ids.
      * @see Thread#getId()
      */
+    @NotNull
     private final ConcurrentMap<Long, Proc> procs;
 
     /**
      * A list of the uncaught exceptions.
      */
+    @NotNull
     private final List<Throwable> uncaughtExceptions;
 
     /**
@@ -58,7 +66,7 @@ public class Node extends ThreadGroup {
      *
      * @param name The Node's name.
      */
-    public Node(String name) {
+    public Node(@NotNull final String name) {
         super(name);
         this.selfId = new LocalNodeId(this);
         this.procs = new ConcurrentHashMap<>();
@@ -69,10 +77,10 @@ public class Node extends ThreadGroup {
     public NodeId getRef() { return selfId; }
 
     /**
-     * Get all uncaughtExceptions. The caller is free to
-     * remove exceptions or clear the list.
+     * Get all uncaught exceptions throw by {@link Proc}s running on this node.
+     * It is thread-safe for the caller to remove exceptions or clear the list.
      *
-     * @return A list of uncaught exceptions.
+     * @return A list of uncaught exceptions thrown by {@link Proc}s on this Node.
      */
     public List<Throwable> getUncaughtExceptions() {
         return uncaughtExceptions;
@@ -80,6 +88,8 @@ public class Node extends ThreadGroup {
 
     /**
      * Join all currently running {@link Proc}s.
+     *
+     * @see Thread#join()
      *
      * @throws InterruptedException If the thread is interrupted while waiting.
      */
@@ -95,7 +105,7 @@ public class Node extends ThreadGroup {
      * @param msg The message to send.
      */
     // todo: dead letters
-    final void send(final ProcId pid, final Object msg) {
+    final void send(@NotNull final ProcId pid, @NotNull final Object msg) {
         NodeId nid = pid.node();
         if (nid.equals(getRef())) {
             Proc proc = procs.get(pid.id());
@@ -116,7 +126,7 @@ public class Node extends ThreadGroup {
      * @param args Arguments for the new {@link Proc}'s constructor.
      * @return The {@link ProcId} of the spawned Proc.
      */
-    public ProcId spawn(Class<? extends Proc> procType, Object... args) {
+    public ProcId spawn(@NotNull Class<? extends Proc> procType, Object... args) {
         Proc proc;
         if (args == null)
             args = new Object[0];
@@ -153,7 +163,7 @@ public class Node extends ThreadGroup {
      * @param procType The type of {@link Proc} to spawn.
      * @return The {@link ProcId} of the spawned Proc.
      */
-    public ProcId spawn(Class<? extends Proc> procType) {
+    public ProcId spawn(@NotNull Class<? extends Proc> procType) {
         return spawn(procType, (Object[]) null);
     }
 
@@ -163,10 +173,28 @@ public class Node extends ThreadGroup {
      * @param zero The body of the proc.
      * @return The {@link ProcId} of the spawned Proc.
      */
-    public ProcId spawn(Lambda.Zero zero) {
+    public ProcId spawn(@NotNull Lambda.Zero zero) {
         if (zero == null)
             throw new NullPointerException();
         Proc proc = new Lambda.Anon(this, zero);
+        procs.put(proc.getId(), proc);
+        proc.start();
+        log.debug("{} spawned in {}", proc, this);
+        return proc.self();
+    }
+
+    /**
+     * Spawn a recursive proc.
+     *
+     * @param rec The body of the proc.
+     * @param t The initial argument.
+     * @param <T> The type of the argument and the body's return type.
+     * @return The ProcId of the spawned Proc.
+     */
+    public <T> ProcId spawnRecursive(@NotNull Lambda.Recursive<T> rec, T t) {
+        if (rec == null)
+            throw new NullPointerException();
+        Proc proc = new Lambda.Rec<>(this, rec, t);
         procs.put(proc.getId(), proc);
         proc.start();
         log.debug("{} spawned in {}", proc, this);
@@ -181,26 +209,8 @@ public class Node extends ThreadGroup {
      * @param <A> The type of the argument.
      * @return The {@link ProcId} of the spawned Proc.
      */
-    public <A> ProcId spawn(Lambda.One<A> one, A a) {
+    public <A> ProcId spawn(@NotNull Lambda.One<A> one, A a) {
         return spawn(() -> one.accept(a));
-    }
-
-    /**
-     * Spawn a recursive proc.
-     *
-     * @param rec The body of the proc.
-     * @param t The initial argument.
-     * @param <T> The type of the argument and the body's return type.
-     * @return The ProcId of the spawned Proc.
-     */
-    public <T> ProcId spawnRecursive(Lambda.Recursive<T> rec, T t) {
-        if (rec == null)
-            throw new NullPointerException();
-        Proc proc = new Lambda.Rec<>(this, rec, t);
-        procs.put(proc.getId(), proc);
-        proc.start();
-        log.debug("{} spawned in {}", proc, this);
-        return proc.self();
     }
 
     /**
@@ -213,7 +223,7 @@ public class Node extends ThreadGroup {
      * @param <B> The type of the second argument.
      * @return The ProcId of the spawned Proc.
      */
-    public <A, B> ProcId spawn(Lambda.Two<A, B> two, A a, B b) {
+    public <A, B> ProcId spawn(@NotNull Lambda.Two<A, B> two, A a, B b) {
         return spawn(() -> two.accept(a, b));
     }
 
@@ -229,7 +239,7 @@ public class Node extends ThreadGroup {
      * @param <C> The type of the third argument.
      * @return The ProcId of the spawned Proc.
      */
-    public <A, B, C> ProcId spawn(Lambda.Three<A, B, C> three, A a, B b, C c) {
+    public <A, B, C> ProcId spawn(@NotNull Lambda.Three<A, B, C> three, A a, B b, C c) {
         return spawn(() -> three.accept(a, b, c));
     }
 
@@ -248,7 +258,7 @@ public class Node extends ThreadGroup {
      * @param <D> The type of the fourth argument.
      * @return The ProcId of the spawned Proc.
      */
-    public <A, B, C, D> ProcId spawn(Lambda.Four<A, B, C, D> four, A a, B b, C c, D d) {
+    public <A, B, C, D> ProcId spawn(@NotNull Lambda.Four<A, B, C, D> four, A a, B b, C c, D d) {
         return spawn(() -> four.accept(a, b, c, d));
     }
 
@@ -268,6 +278,8 @@ public class Node extends ThreadGroup {
     /**
      * Used for testing only!!!
      */
+    @TestOnly
+    @Contract("null -> null")
     Proc unsafeGetProc(ProcId pid) {
         if (pid != null)
             return procs.get(pid.id());

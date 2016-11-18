@@ -21,6 +21,8 @@ package erlike;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.concurrent.locks.*;
+
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.*;
 
 /**
@@ -115,7 +117,7 @@ public class SignalBarrier {
      * @param timeout The timeout duration.
      * @param unit The units of the timeout duration.
      */
-    public void await(long timeout, TimeUnit unit) throws InterruptedException {
+    public void await(long timeout, @NotNull TimeUnit unit) throws InterruptedException {
         awaitNanos(unit.toNanos(timeout));
     }
 
