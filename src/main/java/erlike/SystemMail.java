@@ -32,19 +32,19 @@ interface SystemMail extends Serializable {
      *
      * @param proc The proc to visit.
      */
-    public abstract void visit(Proc proc);
+    void visit(Proc proc);
 
     /**
      * This represents system mail that has a sender process.
      */
-    static abstract class SenderMail implements SystemMail {
-        private final Pid sender;
+    abstract class SenderMail implements SystemMail {
+        private final ProcId sender;
 
-        protected SenderMail(Pid sender) {
+        protected SenderMail(ProcId sender) {
             this.sender = sender;
         }
 
-        public Pid getSender() {
+        public ProcId getSender() {
             return sender;
         }
     }
@@ -52,8 +52,10 @@ interface SystemMail extends Serializable {
     /**
      * Sent to complete a link between two processes.
      */
-    static class Link extends SenderMail {
-        public Link(Pid sender) {
+    class Link extends SenderMail {
+        private static final long serialVersionUID = 1L;
+
+        public Link(ProcId sender) {
             super(sender);
         }
 
@@ -66,8 +68,10 @@ interface SystemMail extends Serializable {
     /**
      * Sent to complete a link between two processes.
      */
-    static class Unlink extends SenderMail {
-        public Unlink(Pid sender) {
+    class Unlink extends SenderMail {
+        private static final long serialVersionUID = 1L;
+
+        public Unlink(ProcId sender) {
             super(sender);
         }
 
@@ -80,8 +84,10 @@ interface SystemMail extends Serializable {
     /**
      * Sent to notify a proc that another has exited.
      */
-    static class LinkExit extends SenderMail {
-        public LinkExit(Pid sender) {
+    class LinkExit extends SenderMail {
+        private static final long serialVersionUID = 1L;
+
+        public LinkExit(ProcId sender) {
             super(sender);
         }
 

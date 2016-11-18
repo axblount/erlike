@@ -20,6 +20,8 @@ package erlike;
 
 import org.slf4j.*;
 import java.time.Duration;
+import java.util.Random;
+import java.util.function.Consumer;
 
 /**
  * <p>
@@ -50,7 +52,7 @@ public final class Library {
         if (t instanceof Proc) {
             return (Proc)t;
         } else {
-            log.error("Non-Proc thread {} attempted to use Proc Library.", t);
+            log.error("Non-Proc thread {} attempted to use Erlike Library.", t);
             throw new IllegalStateException("Cannot call Proc Library functions from outside a Proc");
         }
     }
@@ -59,7 +61,7 @@ public final class Library {
      * @see Proc#self()
      * @return The process id of the current Proc.
      */
-    public static Pid self() {
+    public static ProcId self() {
         return currentProc().self();
     }
 
@@ -67,7 +69,7 @@ public final class Library {
      * @see Proc#node()
      * @return The node the current proc is running on.
      */
-    public static Node node() {
+    public static NodeId node() {
         return currentProc().node();
     }
 
@@ -99,7 +101,7 @@ public final class Library {
      * @see Proc#receive(PartialConsumer, Duration, Runnable)
      */
     public static void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
-            throws InterruptedException {
+            throws Exception {
         currentProc().receive(handler, timeout, timeoutHandler);
     }
 
@@ -107,7 +109,7 @@ public final class Library {
      * @see Proc#receive(PartialConsumer, Duration)
      */
     public static void receive(PartialConsumer handler, Duration timeout)
-            throws InterruptedException {
+            throws Exception {
         receive(handler, timeout, null);
     }
 
@@ -115,7 +117,7 @@ public final class Library {
      * @see Proc#receive(PartialConsumer)
      */
     public static void receive(PartialConsumer handler)
-            throws InterruptedException {
+            throws Exception {
         receive(handler, null, null);
     }
 
@@ -127,16 +129,16 @@ public final class Library {
     }
 
     /**
-     * @see Proc#link(Pid)
+     * @see Proc#link(ProcId)
      */
-    public static void link(Pid other) {
+    public static void link(ProcId other) {
         currentProc().link(other);
     }
 
     /**
-     * @see Proc#unlink(Pid)
+     * @see Proc#unlink(ProcId)
      */
-    public static void unlink(Pid other) {
+    public static void unlink(ProcId other) {
         currentProc().unlink(other);
     }
 }

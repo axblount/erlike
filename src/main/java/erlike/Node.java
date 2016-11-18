@@ -18,26 +18,29 @@
  */
 package erlike;
 
-import java.io.IOException;
-import java.io.ObjectOutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.util.*;
 import java.lang.reflect.*;
 import java.util.concurrent.*;
 import org.slf4j.*;
 
 /**
- * An Erlike Node.
+ * A Node represents a group of {@link Proc}s. The node keeps track of all running
+ * {@link Proc}s and managing communication with other Nodes. In plain ol' Java terms:
+ * <code>
+ *     {@link Node} : {@link ThreadGroup} :: {@link Proc} : {@link Thread}
+ * </code>
+ *
+ * Node objects should only be handled at the top-level of your program. Inside of {@link Proc}s
+ * Nodes should be referenced by {@link NodeId}s. You can get the {@link NodeId} for a Node with
+ * {@link #getRef()}.
+ *
+ * @see NodeId
+ * @see ThreadGroup
  */
-public class Node implements Thread.UncaughtExceptionHandler {
+public class Node extends ThreadGroup {
     private static final Logger log = LoggerFactory.getLogger(Node.class);
 
-    /** The name of the Node. */
-    private final String name;
-
-    private final UUID uuid;
+    private final NodeId selfId;
 
     /**
      * A map of procs by their thread ids.
@@ -50,37 +53,20 @@ public class Node implements Thread.UncaughtExceptionHandler {
      */
     private final List<Throwable> uncaughtExceptions;
 
-    private final Server server;
-
     /**
      * Create a new Node.
      *
      * @param name The Node's name.
      */
     public Node(String name) {
-        this.name = name;
-        this.uuid = UUID.randomUUID();
+        super(name);
+        this.selfId = new LocalNodeId(this);
         this.procs = new ConcurrentHashMap<>();
         this.uncaughtExceptions = Collections.synchronizedList(new LinkedList<>());
-        log.debug("Node starting: {} {}.", name, uuid);
-        try {
-            this.server = new Server(this, new InetSocketAddress(13331));
-        } catch (IOException e) {
-            log.error("Couldn't start server.", e);
-            throw new RuntimeException("Couldn't start Node server", e);
-        }
+        log.debug("Node starting: {}.", name);
     }
 
-    /**
-     * Get the Node's name.
-     *
-     * @return The Node's name.
-     */
-    public String getName() { return name; }
-
-    public UUID getUUID() { return uuid; }
-
-    public Nid getRef() { return new Nid(this); }
+    public NodeId getRef() { return selfId; }
 
     /**
      * Get all uncaughtExceptions. The caller is free to
@@ -105,18 +91,19 @@ public class Node implements Thread.UncaughtExceptionHandler {
     /**
      * Send a message to a {@link Proc} on another node.
      *
-     * @param pid The pid of the target {@link Proc}.
+     * @param pid The {@link ProcId} of the target {@link Proc}.
      * @param msg The message to send.
      */
     // todo: dead letters
-    final void send(final Pid pid, final Object msg) {
-        Nid nid = pid.getNid();
-        if (nid.uuid == uuid) {
-            Proc proc = procs.get(pid.getProcId());
+    final void send(final ProcId pid, final Object msg) {
+        NodeId nid = pid.node();
+        if (nid.equals(getRef())) {
+            Proc proc = procs.get(pid.id());
             if (proc != null)
                 proc.addMail(msg);
         } else {
-            server.sendOutgoingMail(pid, msg);
+            log.error("Out of node messaging not yet supported.");
+            throw new RuntimeException("Out of node message.");
         }
     }
 
@@ -127,9 +114,9 @@ public class Node implements Thread.UncaughtExceptionHandler {
      *
      * @param procType The type of {@link Proc} to spawn.
      * @param args Arguments for the new {@link Proc}'s constructor.
-     * @return The {@link Pid} of the spawned Proc.
+     * @return The {@link ProcId} of the spawned Proc.
      */
-    public Pid spawn(Class<? extends Proc> procType, Object... args) {
+    public ProcId spawn(Class<? extends Proc> procType, Object... args) {
         Proc proc;
         if (args == null)
             args = new Object[0];
@@ -153,9 +140,9 @@ public class Node implements Thread.UncaughtExceptionHandler {
             throw new RuntimeException("Couldn't spawn proc.", e);
         }
 
-        Pid pid = bindAndStart(proc);
-        log.debug("{} of type {} spawned.", pid, procType);
-        return pid;
+        proc.start();
+        log.debug("{} (type: {}) spawned in {}", proc, procType, this);
+        return proc.self();
     }
 
     /**
@@ -164,9 +151,9 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @see #spawn(Class, Object...)
      *
      * @param procType The type of {@link Proc} to spawn.
-     * @return The {@link Pid} of the spawned Proc.
+     * @return The {@link ProcId} of the spawned Proc.
      */
-    public Pid spawn(Class<? extends Proc> procType) {
+    public ProcId spawn(Class<? extends Proc> procType) {
         return spawn(procType, (Object[]) null);
     }
 
@@ -174,13 +161,16 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * Spawn an anonymous proc that takes zero arguments.
      *
      * @param zero The body of the proc.
-     * @return The {@link Pid} of the spawned Proc.
+     * @return The {@link ProcId} of the spawned Proc.
      */
-    public Pid spawn(Lambda.Zero zero) {
+    public ProcId spawn(Lambda.Zero zero) {
         if (zero == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Anon(zero);
-        return bindAndStart(proc);
+        Proc proc = new Lambda.Anon(this, zero);
+        procs.put(proc.getId(), proc);
+        proc.start();
+        log.debug("{} spawned in {}", proc, this);
+        return proc.self();
     }
 
     /**
@@ -189,13 +179,10 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param one The body of the proc.
      * @param a The argument.
      * @param <A> The type of the argument.
-     * @return The {@link Pid} of the spawned Proc.
+     * @return The {@link ProcId} of the spawned Proc.
      */
-    public <A> Pid spawn(Lambda.One<A> one, A a) {
-        if (one == null)
-            throw new NullPointerException();
-        Proc proc = new Lambda.Anon(() -> one.accept(a));
-        return bindAndStart(proc);
+    public <A> ProcId spawn(Lambda.One<A> one, A a) {
+        return spawn(() -> one.accept(a));
     }
 
     /**
@@ -204,13 +191,16 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param rec The body of the proc.
      * @param t The initial argument.
      * @param <T> The type of the argument and the body's return type.
-     * @return The pid of the spawned Proc.
+     * @return The ProcId of the spawned Proc.
      */
-    public <T> Pid spawnRecursive(Lambda.Recursive<T> rec, T t) {
+    public <T> ProcId spawnRecursive(Lambda.Recursive<T> rec, T t) {
         if (rec == null)
             throw new NullPointerException();
-        Proc proc = new Lambda.Rec<>(rec, t);
-        return bindAndStart(proc);
+        Proc proc = new Lambda.Rec<>(this, rec, t);
+        procs.put(proc.getId(), proc);
+        proc.start();
+        log.debug("{} spawned in {}", proc, this);
+        return proc.self();
     }
 
     /**
@@ -221,13 +211,10 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param b The second argument.
      * @param <A> The type of the first argument.
      * @param <B> The type of the second argument.
-     * @return The pid of the spawned Proc.
+     * @return The ProcId of the spawned Proc.
      */
-    public <A, B> Pid spawn(Lambda.Two<A, B> two, A a, B b) {
-        if (two == null)
-            throw new NullPointerException();
-        Proc proc = new Lambda.Anon(() -> two.accept(a, b));
-        return bindAndStart(proc);
+    public <A, B> ProcId spawn(Lambda.Two<A, B> two, A a, B b) {
+        return spawn(() -> two.accept(a, b));
     }
 
     /**
@@ -240,17 +227,15 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param <A> The type of the first argument.
      * @param <B> The type of the second argument.
      * @param <C> The type of the third argument.
-     * @return The pid of the spawned Proc.
+     * @return The ProcId of the spawned Proc.
      */
-    public <A, B, C> Pid spawn(Lambda.Three<A, B, C> three, A a, B b, C c) {
-        if (three == null)
-            throw new NullPointerException();
-        Proc proc = new Lambda.Anon(() -> three.accept(a, b, c));
-        return bindAndStart(proc);
+    public <A, B, C> ProcId spawn(Lambda.Three<A, B, C> three, A a, B b, C c) {
+        return spawn(() -> three.accept(a, b, c));
     }
 
     /**
-     * Spawn an anonymous proc with four arguments.
+     * Spawn an anonymous proc with four arguments. If you have a proc that requires
+     * more than four arguments, you should wrap them up in an object.
      *
      * @param four The body of the proc.
      * @param a The first argument.
@@ -261,26 +246,10 @@ public class Node implements Thread.UncaughtExceptionHandler {
      * @param <B> The type of the second argument.
      * @param <C> The type of the third argument.
      * @param <D> The type of the fourth argument.
-     * @return The pid of the spawned Proc.
+     * @return The ProcId of the spawned Proc.
      */
-    public <A, B, C, D> Pid spawn(Lambda.Four<A, B, C, D> four, A a, B b, C c, D d) {
-        if (four == null)
-            throw new NullPointerException();
-        Proc proc = new Lambda.Anon(() -> four.accept(a, b, c, d));
-        return bindAndStart(proc);
-    }
-
-    /**
-     * Assign the given proc an id, bind it to this node, and start the proc.
-     *
-     * @param proc The proc to register, bind, and start.
-     * @return The pid of the new proc.
-     */
-    private Pid bindAndStart(Proc proc) {
-        Pid pid = proc.startInNode(this);
-        procs.put(proc.getId(), proc);
-        log.debug("{} spawned.", pid);
-        return pid;
+    public <A, B, C, D> ProcId spawn(Lambda.Four<A, B, C, D> four, A a, B b, C c, D d) {
+        return spawn(() -> four.accept(a, b, c, d));
     }
 
     /**
@@ -299,9 +268,9 @@ public class Node implements Thread.UncaughtExceptionHandler {
     /**
      * Used for testing only!!!
      */
-    Proc unsafeGetProc(Pid pid) {
+    Proc unsafeGetProc(ProcId pid) {
         if (pid != null)
-            return procs.get(pid.getProcId());
+            return procs.get(pid.id());
         return null;
     }
 
@@ -314,7 +283,7 @@ public class Node implements Thread.UncaughtExceptionHandler {
      */
     @Override
     public void uncaughtException(Thread t, Throwable e) {
-        log.error("Node {} got an uncaught an exception from {}!!!", name, t, e);
+        log.error("Node {} got an uncaught an exception from {}!!!", getName(), t, e);
         uncaughtExceptions.add(e);
     }
 }

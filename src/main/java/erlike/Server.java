@@ -8,13 +8,14 @@ import java.util.concurrent.*;
 import static erlike.Library.*;
 
 class Server {
+    /*
     private static final Logger log = LoggerFactory.getLogger(Server.class);
 
     private Node node;
     private ServerSocket serverSocket;
-    private ConcurrentMap<Nid, Socket> connections;
+    private ConcurrentMap<NodeId, Socket> connections;
 
-    private Pid listener, outgoing;
+    private ProcId listener, outgoing;
 
     Server(Node node, SocketAddress addr) throws IOException {
         this.node = node;
@@ -27,7 +28,7 @@ class Server {
         outgoing = node.spawn(this::outgoing);
     }
 
-    public void sendOutgoingMail(Pid pid, Object msg) {
+    public void sendOutgoingMail(ProcId pid, Object msg) {
         outgoing.send(new Envelope(pid, msg));
     }
 
@@ -38,9 +39,9 @@ class Server {
                 ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
                 ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
 
-                Nid nid;
+                NodeId nid;
                 try {
-                    nid = (Nid) inputStream.readObject();
+                    nid = (NodeId) inputStream.readObject();
                     outputStream.writeObject(node.getRef());
                 } catch (Exception e) {
                     log.error("Failed to confirm connection with new node at {}.",
@@ -65,7 +66,7 @@ class Server {
     private void outgoing() throws Exception {
         while (true) {
             receive(new PartialConsumer().match(Envelope.class, (env) -> {
-                Socket socket = connections.get(env.pid.getNid());
+                Socket socket = connections.get(env.pid.getNodeId());
                 if (socket == null)
                     return; // TODO: retry connection!
                 if (!(socket.isClosed() || socket.isOutputShutdown())) {
@@ -99,7 +100,7 @@ class Server {
         }
     }
 
-    public Nid connect(URL url) throws IOException {
+    public NodeId connect(URL url) throws IOException {
         InetAddress address = InetAddress.getByName(url.getHost());
         int port = url.getPort();
         if (port == -1) {
@@ -116,7 +117,7 @@ class Server {
             ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
 
             outputStream.writeObject(node.getRef());
-            Nid nid = (Nid) inputStream.readObject();
+            NodeId nid = (NodeId) inputStream.readObject();
 
             node.spawn(this::incoming, inputStream);
 
@@ -127,4 +128,5 @@ class Server {
         }
         return null;
     }
+    */
 }

@@ -29,7 +29,8 @@ public class Lambda {
     static class Anon extends Proc {
         private final Zero lambda;
 
-        Anon(final Zero lambda) {
+        Anon(final Node node, final Zero lambda) {
+            super(node);
             if (lambda == null)
                 throw new NullPointerException();
             this.lambda = lambda;
@@ -50,7 +51,8 @@ public class Lambda {
         private final Recursive<T> lambda;
         private final T initArg;
 
-        Rec(final Recursive<T> lambda, final T initArg) {
+        Rec(Node node, final Recursive<T> lambda, final T initArg) {
+            super(node);
             if (lambda == null || initArg == null)
                 throw new NullPointerException();
             this.lambda = lambda;
@@ -67,31 +69,31 @@ public class Lambda {
 
     @FunctionalInterface
     public interface Zero {
-        public void run() throws Exception;
+        void run() throws Exception;
     }
 
     @FunctionalInterface
     public interface One<A> {
-        public void accept(A a) throws Exception;
+        void accept(A a) throws Exception;
     }
 
     @FunctionalInterface
     public interface Two<A, B> {
-        public void accept(A a, B b) throws Exception;
+        void accept(A a, B b) throws Exception;
     }
 
     @FunctionalInterface
     public interface Three<A, B, C> {
-        public void accept(A a, B b, C c) throws Exception;
+        void accept(A a, B b, C c) throws Exception;
     }
 
     @FunctionalInterface
     public interface Four<A, B, C, D> {
-        public void accept(A a, B b, C c, D d) throws Exception;
+        void accept(A a, B b, C c, D d) throws Exception;
     }
 
     @FunctionalInterface
     public interface Recursive<T> {
-        public T apply(T arg) throws Exception;
+        T apply(T arg) throws Exception;
     }
 }

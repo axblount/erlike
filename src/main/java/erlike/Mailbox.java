@@ -42,7 +42,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
 
         @SuppressWarnings("unused")
         private volatile Node<E> volatileNext;
-
+        
         private static final AtomicReferenceFieldUpdater<Node, Node> nextAccess =
                 AtomicReferenceFieldUpdater.newUpdater(Node.class, Node.class, "volatileNext");
 
@@ -89,7 +89,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
     public boolean offer(E e) {
         if (e == null)
             throw new NullPointerException();
-        Node<E> newTail = new Node<E>(e);
+        Node<E> newTail = new Node<>(e);
         Node<E> oldTail = tailAccess.getAndSet(this, newTail);
 
         // oldTail is now out of reach for producers.
@@ -149,7 +149,8 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
 
     @Override
     public void put(E e) throws InterruptedException {
-        offer(e);
+        if (!offer(e))
+            assert false : "Unreachable, mailbox has no max capacity.";
     }
 
     @Override
@@ -228,6 +229,12 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
      * This method moves the head and tail pointers
      * as necessary.
      *
+     * In a normal multiple producer single consumer queue, we never have to worry
+     * about producers messing with the head pointer. The {@link #pollMatch(Predicate)},
+     * {@link #pollMatch(Predicate, long, TimeUnit)}, and {@link #takeMatch(Predicate)}
+     * methods change this. We rely on {@code removeNode} to make sure that the head and tail
+     * pointers are handled properly. (Hopefully it succeeds.)
+     *
      * @param prev The node previous to the one being removed.
      * @param node The node to be removed.
      * @return The item stored in the removed node.
@@ -268,7 +275,14 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
         return result;
     }
 
-    public E pollMatch(Predicate<Object> pred) {
+    /**
+     * This non-blocking method returns the first object in the Mailbox that matches
+     * the given predicate.
+     *
+     * @param pred A predicate matching the object to be searched for.
+     * @return The found object. Or, if no such object exists, null.
+     */
+    public E pollMatch(Predicate<E> pred) {
         Node<E> prev = headAccess.get(this),
                 node = prev.getNext();
 
@@ -286,7 +300,19 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
         return null;
     }
 
-    public E pollMatch(Predicate<Object> pred, long timeout, TimeUnit unit) throws InterruptedException {
+    /**
+     * This blocking method will return the first object matching a predicate from the queue.
+     * If no such object exists, it will wait for a given time period for one to be added. If that
+     * period expires, it will return null.
+     *
+     * @param pred A predicate that matches the object to be searched for.
+     * @param timeout The duration of the timeout.
+     * @param unit The unit for the timeout duration.
+     * @return The matched object. If none exists, null.
+     * @throws InterruptedException This exception is thrown if the thread is interrupted while
+     * the poll is waiting.
+     */
+    public E pollMatch(Predicate<E> pred, long timeout, TimeUnit unit) throws InterruptedException {
         long nanos = unit.toNanos(timeout);
         Node<E> prev = headAccess.get(this),
                 node = prev.getNext();
@@ -311,7 +337,15 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
         }
     }
 
-    public E takeMatch(Predicate<Object> pred) throws InterruptedException {
+    /**
+     * Take an object matching a given predicate from the queue. This method will
+     * block until such an object is added to the queue, or the thread is interrupted.
+     *
+     * @param pred A predicate that matches the object to be searched for.
+     * @return The matched object.
+     * @throws InterruptedException
+     */
+    public E takeMatch(Predicate<E> pred) throws InterruptedException {
         Node<E> prev = headAccess.get(this),
                 node = prev.getNext();
 

@@ -21,60 +21,64 @@ package erlike;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.*;
 import org.slf4j.*;
 
 /**
  * An Erlike process. This is a specialized thread with builtin functions
  * (i.e. protected final methods). User defined Procs will subclass this.
  * <p>
- * I extend Thread because I am a wild man.
- * <p>
- * TODO: Write an explanation of why extending thread is a Good Thing in this case.
+ * I have tried to reuse Java's own multi threading machinery when possible.
+ * This class extends {@link Thread} to avoid duplicating work. Similarly, {@link Node}
+ * extends {@link ThreadGroup}.
+ *
+ * @see ProcId
+ * @see Thread
  */
 public abstract class Proc extends Thread {
     private static final Logger log = LoggerFactory.getLogger(Proc.class);
 
-    /** A unique exception used to signal that a Proc is exiting. */
+    /**
+     * A unique exception used to signal that a Proc is exiting.
+     * We need to be able to uniquely identify this exception across a network.
+     */
     private static final RuntimeException NORMAL_EXIT = new RuntimeException() {
-        static final long serialVersionUID = 1L;
+        static final long serialVersionUID = 0xDEADL;
     };
 
-    /** The {@link Node} this Proc is running on. */
-    private Node node;
+    /** The {@link Node} for this Proc. */
+    private final Node node;
 
-    /** The process id of this Proc. */
-    private Pid pid;
+    /** The process id ({@link ProcId}) of this Proc. */
+    private final ProcId selfId;
 
-    /** The queue of incoming messages. */
-    private Mailbox<Object> mailbox;
-
-    /** The set of linked Procs. Needs to be thread-safe. */
-    private Set<Pid> links;
+    /** The queue of incoming messages. Messages can be of any type. */
+    private final Mailbox<Object> mailbox;
 
     /**
-     * Bind this Proc to a {@link Node}, establishing its identity.
-     * This should be called exactly once.
+     * The set of linked Procs. Needs to be thread-safe.
      *
-     * @param node The {@link Node} this Proc is running on.
-     * @return Pid of the bound process.
+     * @see #link(ProcId)
+     * @see #unlink(ProcId)
+     * @see #completeLink(ProcId)
+     * @see #completeUnlink(ProcId)
      */
-    final Pid startInNode(final Node node) {
+    private final Set<ProcId> links;
+
+    /**
+     * @param node The {@link Node} this Proc is running on.
+     */
+    public Proc(Node node) {
+        super(node, "");
+
         if (node == null)
             throw new NullPointerException("Proc cannot be bound to null Node.");
-        if (getState() != State.NEW)
-            throw new IllegalStateException("Proc cannot be bound twice.");
 
         this.node = node;
-        pid = new Pid(this.node, getId());
+        selfId = new LocalProcId(this);
         mailbox = new Mailbox<>();
         links = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-        setName(pid.toString());
-        setUncaughtExceptionHandler(this.node);
-        start();
-
-        return pid;
+        setName(selfId.toString());
     }
 
     /**
@@ -93,7 +97,8 @@ public abstract class Proc extends Thread {
             // procs being configured to trap system mail.
             ((SystemMail)msg).visit(this);
         else
-            mailbox.offer(msg);
+            if (!mailbox.offer(msg))
+                assert false : "Unreachable, mailbox has no max capacity.";
     }
 
     /**
@@ -106,11 +111,11 @@ public abstract class Proc extends Thread {
         try {
             main();
         } catch (InterruptedException e) {
-            log.debug("{} was interrupted.", pid, e);
+            log.debug("{} was interrupted.", selfId, e);
             reason = e;
         } catch (Exception e) {
             if (e == NORMAL_EXIT) {
-                log.debug("{} exited.", pid);
+                log.debug("{} exited.", selfId);
             } else {
                 reason = e;
                 node.uncaughtException(this, e);
@@ -126,7 +131,7 @@ public abstract class Proc extends Thread {
      * @param reason The reason this proc exited.
      */
     private void notifyLinksAndMonitors(Throwable reason) {
-        Pid self = self();
+        ProcId self = self();
         if (reason != NORMAL_EXIT) {
             // Only notify links if the exit wasn't normal.
             log.debug("{} notifying links of abnormal exit.", self, reason);
@@ -141,17 +146,17 @@ public abstract class Proc extends Thread {
     /*=====================*/
 
     /**
-     * @return The {@link Pid} of this Proc.
+     * @return The {@link ProcId} of this Proc.
      */
-    public final Pid self() {
-        return this.pid;
+    public final ProcId self() {
+        return this.selfId;
     }
 
     /**
      * @return The node this proc is running on.
      */
-    public final Node node() {
-        return node;
+    public final NodeId node() {
+        return new LocalNodeId(node);
     }
 
     /**
@@ -233,7 +238,7 @@ public abstract class Proc extends Thread {
      * @param timeoutHandler The action to take if the receive times out.
      */
     protected final void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
-            throws InterruptedException {
+            throws Exception {
         if (handler == null)
             throw new NullPointerException("recieve requires a message handler.");
         if (timeout == null && timeoutHandler != null)
@@ -267,7 +272,7 @@ public abstract class Proc extends Thread {
      * @param timeout The duration to wait for a message.
      */
     protected final void receive(PartialConsumer handler, Duration timeout)
-            throws InterruptedException {
+            throws Exception {
         receive(handler, timeout, null);
     }
 
@@ -282,7 +287,7 @@ public abstract class Proc extends Thread {
      * @param handler A consumer for the received message.
      */
     protected final void receive(PartialConsumer handler)
-            throws InterruptedException {
+            throws Exception {
         receive(handler, null, null);
     }
 
@@ -299,29 +304,30 @@ public abstract class Proc extends Thread {
      * If a link already exists, this method has no
      * effect.
      *
-     * @param other The pid to link.
+     * @param other The selfId to link.
      */
-    protected final void link(Pid other) {
+    // TODO: Add logging to all link methods.
+    protected final void link(ProcId other) {
         links.add(other);
-        other.send(new SystemMail.Link(self()));
+        other.send(new SystemMail.Link(selfId));
     }
 
     /**
      * Destroy any link between this process and another.
      * If no link exists, this method has no effect.
      *
-     * @param other The pid to link.
+     * @param other The selfId to link.
      */
-    protected final void unlink(Pid other) {
+    protected final void unlink(ProcId other) {
         links.remove(other);
-        other.send(new SystemMail.Unlink(self()));
+        other.send(new SystemMail.Unlink(selfId));
     }
 
-    final void completeLink(Pid other) {
+    final void completeLink(ProcId other) {
         links.add(other);
     }
 
-    final void completeUnlink(Pid other) {
+    final void completeUnlink(ProcId other) {
         links.remove(other);
     }
 }

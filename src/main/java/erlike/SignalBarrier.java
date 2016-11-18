@@ -26,6 +26,14 @@ import org.slf4j.*;
 /**
  * A simple barrier for awaiting a signal.
  * Only one thread at a time may await the signal.
+ *
+ * This class uses non-standard parts of the Java language.
+ * Notably {@link LockSupport}, which is provided by OpenJDK
+ * and the Oracle JDK, but isn't in the Java standard.
+ *
+ * @see LockSupport A non-standard class used to control threads.
+ * @see LockSupport#park(Object) Used to pause threads that are waiting for a SignalBarrier.
+ * @see LockSupport#unpark(Thread) Used to awaken threads when a SignalBarrier is signalled.
  */
 public class SignalBarrier {
     private static final Logger log = LoggerFactory.getLogger(SignalBarrier.class);
@@ -41,14 +49,14 @@ public class SignalBarrier {
     private static final AtomicReferenceFieldUpdater<SignalBarrier, Thread> ownerAccess =
         AtomicReferenceFieldUpdater.newUpdater(SignalBarrier.class, Thread.class, "_owner");
 
-    /** Create a new SignalBarrier without an owner. */
+    /** SignalBarriers initially have no owner. */
     public SignalBarrier() {
         _owner = null;
     }
 
     /**
      * Signal the owner that the barrier is ready.
-     * This has no effect if the SignalBarrer is unowned.
+     * This has no effect if the SignalBarrier is unowned.
      */
     public void signal() {
         // Remove the current owner of this barrier.
@@ -82,10 +90,11 @@ public class SignalBarrier {
         // signal barrier as the 'blocker'.
         log.debug("SignalBarrier created and {} parked.", t);
         LockSupport.park(this);
+
         // If a thread has called #signal() the owner should already be null.
-        // However the documentation for LockSupport.unpark makes it clear that
+        // However the documentation for LockSupport#unpark(Thread) makes it clear that
         // threads can wake up for absolutely no reason. Do a compare and set
-        // to make sure we don't wipe out a new owner, keeping in mind that only
+        // to make sure we don't wipe out a new owner, keeping in mind that only one
         // thread should be awaiting at any given moment!
         ownerAccess.compareAndSet(this, t, null);
         log.debug("SignalBarrier broken and {} unparked.", t);

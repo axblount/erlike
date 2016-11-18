@@ -19,8 +19,7 @@
 package erlike;
 
 import org.junit.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.hamcrest.Matchers.*;
 
 import java.time.Duration;
 
@@ -30,8 +29,8 @@ import static org.junit.Assert.*;
 public class ProcTest {
     private class Flag {
         volatile boolean flag = false;
-        void set() { flag = true; }
-        boolean isSet() { return flag; }
+        void raise() { flag = true; }
+        boolean isRaised() { return flag; }
         void reset() { flag = false; }
     }
 
@@ -39,15 +38,15 @@ public class ProcTest {
     public void procAsThreadTest() throws InterruptedException {
         Node node = new Node("procStart");
 
-        Pid pid = node.spawn(() -> Thread.sleep(5000));
+        ProcId pid = node.spawn(() -> Thread.sleep(5000));
         Proc proc = node.unsafeGetProc(pid);
 
         Thread.sleep(100);
-        assertEquals("Thread didn't sleep.", Thread.State.TIMED_WAITING, proc.getState());
+        assertThat("Thread didn't sleep.", proc.getState(), is(Thread.State.TIMED_WAITING));
 
         proc.interrupt();
         Thread.sleep(100);
-        assertEquals("Thread didn't terminate.", Thread.State.TERMINATED, proc.getState());
+        assertThat("Thread didn't terminate.", proc.getState(), is(Thread.State.TERMINATED));
     }
 
     @Test
@@ -55,13 +54,14 @@ public class ProcTest {
         Node node = new Node("basicReceiveTest");
         final Flag flag = new Flag();
 
-        Pid pid = node.spawn(() -> {
-            receive(obj -> flag.set());
+        ProcId pid = node.spawn(() -> {
+            receive(obj -> flag.raise());
         });
 
         pid.send(1);
         Thread.sleep(100);
-        assertTrue("flag wasn't set by receive.", flag.isSet());
+        assertThat("The proc didn't receive the message.",
+                flag.isRaised(), is(true));
     }
 
     @Test
@@ -71,26 +71,29 @@ public class ProcTest {
         final Flag successFlag = new Flag();
         final Flag continueFlag = new Flag();
 
-        Pid pid = node.spawn(() -> {
+        ProcId pid = node.spawn(() -> {
             receive(obj -> {
                         System.err.println(obj);
-                        successFlag.set();
+                        successFlag.raise();
                     },
                     Duration.ofMillis(100),
-                    () -> timeoutFlag.set());
-            continueFlag.set();
+                    () -> timeoutFlag.raise());
+            continueFlag.raise();
         });
 
         node.joinAll();
 
-        assertFalse("success flag was set.", successFlag.isSet());
-        assertTrue("timeout flag was not set.", timeoutFlag.isSet());
-        assertTrue("continue flag was not set.", continueFlag.isSet());
+        assertThat("The success flag was raise. It should not have been reached.",
+                successFlag.isRaised(), is(false));
+        assertThat("The timeout flag was not raise. The timeout handler was never called.",
+                timeoutFlag.isRaised(), is(true));
+        assertThat("The continue flag was not raise. The proc did not continue after the receive timed out.",
+                continueFlag.isRaised(), is(true));
     }
 
     @Test
     public void patternReceiveTest() throws InterruptedException {
-        System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "DEBUG");
+        // System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "DEBUG");
 
         class A {}
         class B {}
@@ -99,15 +102,12 @@ public class ProcTest {
         final Flag aFlag = new Flag();
         final Flag bFlag = new Flag();
 
-        Pid pid = node.spawn(() -> {
-            PartialConsumer handler = new PartialConsumer()
-                    .match(A.class, a ->
-                            aFlag.set())
-                    .match(B.class, b ->
-                            bFlag.set())
-                    .otherwise(obj -> exit());
+        ProcId pid = node.spawn(() -> {
             while (true) {
-                receive(handler);
+                receive(new PartialConsumer()
+                        .match(A.class, a -> aFlag.raise())
+                        .match(B.class, b -> bFlag.raise())
+                        .otherwise(obj -> exit()));
             }
         });
 
@@ -115,22 +115,31 @@ public class ProcTest {
 
         pid.send(new A());
         Thread.sleep(100);
-        assertEquals("there were errors.", 0, node.getUncaughtExceptions().size());
-        assertTrue("A flag was not set.", aFlag.isSet());
-        assertFalse("B flag was set by A.", bFlag.isSet());
+        assertThat("A proc raised an unexpected exception after an 'A' message was sent.",
+                node.getUncaughtExceptions(), empty());
+        assertThat("'A' flag was not raised when an 'A' message was sent.",
+                aFlag.isRaised(), is(true));
+        assertThat("'A' flag was raised when a 'B' message was sent.",
+                bFlag.isRaised(), is(false));
         aFlag.reset();
 
         pid.send(new B());
         Thread.sleep(100);
-        assertEquals("there were errors.", 0, node.getUncaughtExceptions().size());
-        assertFalse("A flag was set by B.", aFlag.isSet());
-        assertTrue("B flag was not set.", bFlag.isSet());
+        assertThat("A proc raised an unexpected exception after a 'B' message was sent.",
+                node.getUncaughtExceptions(), empty());
+        assertThat("'A' flag was raised when a 'B' message was sent.",
+                aFlag.isRaised(), is(false));
+        assertThat("'B' flag was not raised when an 'A' message was sent.",
+                bFlag.isRaised(), is(true));
         bFlag.reset();
 
         pid.send(new Object());
         node.joinAll();
-        assertEquals("there were errors.", 0, node.getUncaughtExceptions().size());
-        assertFalse("A flag was set by an object.", aFlag.isSet());
-        assertFalse("B flag was set by a object.", bFlag.isSet());
+        assertThat("A proc raised an unexpected exception after the exit message was sent.",
+                node.getUncaughtExceptions(), empty());
+        assertThat("'A' flag was raised by a plain old object message.",
+                aFlag.isRaised(), is(false));
+        assertThat("'B' flag was raised by a plain old object message.",
+                bFlag.isRaised(), is(false));
     }
 }
