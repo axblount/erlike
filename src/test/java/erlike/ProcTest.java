@@ -23,6 +23,8 @@ import static org.hamcrest.Matchers.*;
 
 import java.time.Duration;
 
+import erlike.functions.PartialConsumer;
+
 import static erlike.Library.*;
 import static org.junit.Assert.*;
 
@@ -38,7 +40,7 @@ public class ProcTest {
     public void procAsThreadTest() throws InterruptedException {
         Node node = new Node("procStart");
 
-        ProcId pid = node.spawn(() -> Thread.sleep(5000));
+        ProcRef pid = node.spawn(() -> Thread.sleep(5000));
         Proc proc = node.unsafeGetProc(pid);
 
         Thread.sleep(100);
@@ -54,7 +56,7 @@ public class ProcTest {
         Node node = new Node("basicReceiveTest");
         final Flag flag = new Flag();
 
-        ProcId pid = node.spawn(() -> {
+        ProcRef pid = node.spawn(() -> {
             receive(obj -> flag.raise());
         });
 
@@ -71,7 +73,7 @@ public class ProcTest {
         final Flag successFlag = new Flag();
         final Flag continueFlag = new Flag();
 
-        ProcId pid = node.spawn(() -> {
+        ProcRef pid = node.spawn(() -> {
             receive(obj -> {
                         System.err.println(obj);
                         successFlag.raise();
@@ -102,7 +104,7 @@ public class ProcTest {
         final Flag aFlag = new Flag();
         final Flag bFlag = new Flag();
 
-        ProcId pid = node.spawn(() -> {
+        ProcRef pid = node.spawn(() -> {
             while (true) {
                 receive(new PartialConsumer()
                         .match(A.class, a -> aFlag.raise())

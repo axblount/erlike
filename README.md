@@ -13,7 +13,7 @@ uses Java 1.8 lambda expressions and `@FunctionalInterface`s to make life easier
 syntax and mechanics are inspired by [Erlang](https://www.erlang.org/).
 
 ```java
-import erlike.*; // Node & ProcId
+import erlike.*; ProcRef
 import static erlike.Library.*; // self & receive
 
 public class Main {

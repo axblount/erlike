@@ -1,21 +1,14 @@
 package erlike;
 
-import org.slf4j.*;
-import java.io.*;
-import java.net.*;
-import java.util.concurrent.*;
-
-import static erlike.Library.*;
-
 class Server {
     /*
     private static final Logger log = LoggerFactory.getLogger(Server.class);
 
     private Node node;
     private ServerSocket serverSocket;
-    private ConcurrentMap<NodeId, Socket> connections;
+    private ConcurrentMap<NodeRef, Socket> connections;
 
-    private ProcId listener, outgoing;
+    private ProcRef listener, outgoing;
 
     Server(Node node, SocketAddress addr) throws IOException {
         this.node = node;
@@ -28,7 +21,7 @@ class Server {
         outgoing = node.spawn(this::outgoing);
     }
 
-    public void sendOutgoingMail(ProcId pid, Object msg) {
+    public void sendOutgoingMail(ProcRef pid, Object msg) {
         outgoing.send(new Envelope(pid, msg));
     }
 
@@ -39,10 +32,10 @@ class Server {
                 ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
                 ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
 
-                NodeId nid;
+                NodeRef nid;
                 try {
-                    nid = (NodeId) inputStream.readObject();
-                    outputStream.writeObject(node.getRef());
+                    nid = (NodeRef) inputStream.readObject();
+                    outputStream.writeObject(node.self());
                 } catch (Exception e) {
                     log.error("Failed to confirm connection with new node at {}.",
                             socket.getInetAddress(), e);
@@ -100,7 +93,7 @@ class Server {
         }
     }
 
-    public NodeId connect(URL url) throws IOException {
+    public NodeRef connect(URL url) throws IOException {
         InetAddress address = InetAddress.getByName(url.getHost());
         int port = url.getPort();
         if (port == -1) {
@@ -116,8 +109,8 @@ class Server {
             ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
             ObjectOutputStream outputStream = new ObjectOutputStream(socket.getOutputStream());
 
-            outputStream.writeObject(node.getRef());
-            NodeId nid = (NodeId) inputStream.readObject();
+            outputStream.writeObject(node.self());
+            NodeRef nid = (NodeRef) inputStream.readObject();
 
             node.spawn(this::incoming, inputStream);
 

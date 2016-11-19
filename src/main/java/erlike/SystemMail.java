@@ -20,83 +20,81 @@ package erlike;
 
 import java.io.Serializable;
 
-import org.jetbrains.annotations.NotNull;
-
 /**
  * Classes implementing SystemMail will be treated differently
  * when received by processes.
  */
 interface SystemMail extends Serializable {
-    /**
-     * Apply the effect of this system mail to a process.
-     * Subclasses should not rely on this being called inside
-     * of the Proc thread.
-     *
-     * @param proc The proc to visit.
-     */
-    void visit(@NotNull final Proc proc);
+  /**
+   * Apply the effect of this system mail to a process.
+   * Subclasses should not rely on this being called inside
+   * of the Proc thread.
+   *
+   * @param proc The proc to visit.
+   */
+  void visit(Proc proc);
 
-    /**
-     * This represents system mail that has a sender process.
-     */
-    abstract class SenderMail implements SystemMail {
-        private final ProcId sender;
+  /**
+   * This represents system mail that has a sender process.
+   */
+  abstract class SenderMail implements SystemMail {
+    private final ProcRef sender;
 
-        protected SenderMail(ProcId sender) {
-            this.sender = sender;
-        }
-
-        public ProcId getSender() {
-            return sender;
-        }
+    protected SenderMail(ProcRef sender) {
+      this.sender = sender;
     }
 
-    /**
-     * Sent to complete a link between two processes.
-     */
-    class Link extends SenderMail {
-        private static final long serialVersionUID = 1L;
+    public ProcRef getSender() {
+      return sender;
+    }
+  }
 
-        public Link(ProcId sender) {
-            super(sender);
-        }
+  /**
+   * Sent to complete a link between two processes.
+   */
+  class Link extends SenderMail {
+    private static final long serialVersionUID = 1L;
 
-        @Override
-        public void visit(Proc proc) {
-            proc.completeLink(getSender());
-        }
+    public Link(ProcRef sender) {
+      super(sender);
     }
 
-    /**
-     * Sent to complete a link between two processes.
-     */
-    class Unlink extends SenderMail {
-        private static final long serialVersionUID = 1L;
+    @Override
+    public void visit(Proc proc) {
+      proc.completeLink(getSender());
+    }
+  }
 
-        public Unlink(ProcId sender) {
-            super(sender);
-        }
+  /**
+   * Sent to complete a link between two processes.
+   */
+  class Unlink extends SenderMail {
+    private static final long serialVersionUID = 1L;
 
-        @Override
-        public void visit(Proc proc) {
-            proc.completeUnlink(getSender());
-        }
+    public Unlink(ProcRef sender) {
+      super(sender);
     }
 
-    /**
-     * Sent to notify a proc that another has exited.
-     */
-    class LinkExit extends SenderMail {
-        private static final long serialVersionUID = 1L;
-
-        public LinkExit(ProcId sender) {
-            super(sender);
-        }
-
-        @Override
-        public void visit(Proc proc) {
-            // TODO: set interrupt reason
-            proc.interrupt();
-        }
+    @Override
+    public void visit(Proc proc) {
+      proc.completeUnlink(getSender());
     }
+  }
+
+  /**
+   * Sent to notify a proc that another has exited.
+   */
+  class LinkExit extends SenderMail {
+    private static final long serialVersionUID = 1L;
+
+    public LinkExit(ProcRef sender) {
+      super(sender);
+    }
+
+    @Override
+    public void visit(Proc proc) {
+      // TODO: set interrupt reason
+      proc.interrupt();
+    }
+  }
 }

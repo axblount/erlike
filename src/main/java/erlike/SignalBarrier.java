@@ -18,12 +18,12 @@
  */
 package erlike;
 
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.*;
-import java.util.concurrent.locks.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * A simple barrier for awaiting a signal.
@@ -37,127 +37,135 @@ import org.slf4j.*;
  * @see LockSupport#park(Object) Used to pause threads that are waiting for a SignalBarrier.
  * @see LockSupport#unpark(Thread) Used to awaken threads when a SignalBarrier is signalled.
  */
-public class SignalBarrier {
-    private static final Logger log = LoggerFactory.getLogger(SignalBarrier.class);
+class SignalBarrier {
+  private static final Logger log = LoggerFactory.getLogger(SignalBarrier.class);
 
-    /**
-     * The Thread that is currently awaiting the signal.
-     * !!! Don't call this directly !!!
-     */
-    @SuppressWarnings("unused")
-    private volatile Thread _owner;
+  /**
+   * The Thread that is currently awaiting the signal.
+   * !!! NEVER call this directly !!!
+   */
+  @SuppressWarnings("unused")
+  private volatile Thread _owner;
 
-    /** Used to update the owner atomically */
-    private static final AtomicReferenceFieldUpdater<SignalBarrier, Thread> ownerAccess =
-        AtomicReferenceFieldUpdater.newUpdater(SignalBarrier.class, Thread.class, "_owner");
+  /**
+   * Used to update the owner atomically.
+   */
+  private static final AtomicReferenceFieldUpdater<SignalBarrier, Thread> ownerAccess =
+      AtomicReferenceFieldUpdater.newUpdater(SignalBarrier.class, Thread.class, "_owner");
 
-    /** SignalBarriers initially have no owner. */
-    public SignalBarrier() {
-        _owner = null;
+  /**
+   * Create an ownerless SignalBarrier.
+   */
+  public SignalBarrier() {
+    _owner = null;
+  }
+
+  /**
+   * Signal the owner that the barrier is ready.
+   * This has no effect if the SignalBarrier is unowned.
+   */
+  public void signal() {
+    // Remove the current owner of this barrier.
+    Thread t = ownerAccess.getAndSet(this, null);
+
+    // If the owner wasn't null, unpark it.
+    if (t != null) {
+      LockSupport.unpark(t);
+      log.debug("SignalBarrier signaled. {} to be unparked.", t);
+    }
+  }
+
+  /**
+   * Claim the SignalBarrier and block until signaled.
+   *
+   * @throws IllegalStateException If the SignalBarrier already has an owner.
+   * @throws InterruptedException  If the thread is interrupted while waiting.
+   */
+  public void await() throws InterruptedException {
+    // Get the thread that would like to await the signal.
+    Thread t = Thread.currentThread();
+
+    // If a thread is attempting to await, the current owner should be null.
+    if (!ownerAccess.compareAndSet(this, null, t)) {
+      log.error(
+          "{} attempted to use a SignalBarrier already in use by {}", t, ownerAccess.get(this));
+      throw new IllegalStateException(
+          "A second thread tried to acquire a signal barrier that is already owned.");
     }
 
-    /**
-     * Signal the owner that the barrier is ready.
-     * This has no effect if the SignalBarrier is unowned.
-     */
-    public void signal() {
-        // Remove the current owner of this barrier.
-        Thread t = ownerAccess.getAndSet(this, null);
+    // The current thread has taken ownership of this barrier.
+    // Park the current thread until the signal. Record this
+    // signal barrier as the 'blocker'.
+    log.debug("SignalBarrier created and {} parked.", t);
+    LockSupport.park(this);
 
-        // If the owner wasn't null, unpark it.
-        if (t != null) {
-            LockSupport.unpark(t);
-            log.debug("SignalBarrier signaled. {} to be unparked.", t);
-        }
+    // If a thread has called #signal() the owner should already be null.
+    // However the documentation for LockSupport#unpark(Thread) makes it clear that
+    // threads can wake up for absolutely no reason. Do a compare and set
+    // to make sure we don't wipe out a new owner, keeping in mind that only one
+    // thread should be awaiting at any given moment!
+    ownerAccess.compareAndSet(this, t, null);
+    log.debug("SignalBarrier broken and {} unparked.", t);
+
+    // Check to see if we've been unparked because of a thread interrupt.
+    if (t.isInterrupted()) {
+      throw new InterruptedException();
+    }
+  }
+
+  /**
+   * Claim the SignalBarrier and block until signaled or the timeout expires.
+   *
+   * @param timeout The timeout duration.
+   * @param unit    The units of the timeout duration.
+   * @throws IllegalStateException If the SignalBarrier already has an owner.
+   * @throws InterruptedException  If the thread is interrupted while waiting.
+   * @see #awaitNanos(long)
+   */
+  public void await(long timeout, TimeUnit unit) throws InterruptedException {
+    awaitNanos(unit.toNanos(timeout));
+  }
+
+  /**
+   * Claim the SignalBarrier and block until signaled or the timeout expires.
+   *
+   * @param timeout The timeout duration in nanoseconds.
+   * @return The timeout minus the number of nanoseconds that passed while waiting.
+   * @throws IllegalStateException If the SignalBarrier already has an owner.
+   * @throws InterruptedException  If the thread is interrupted while waiting.
+   */
+  public long awaitNanos(long timeout) throws InterruptedException {
+    if (timeout <= 0) {
+      return 0;
+    }
+    // Get the thread that would like to await the signal.
+    Thread t = Thread.currentThread();
+
+    // If a thread is attempting to await, the current owner should be null.
+    if (!ownerAccess.compareAndSet(this, null, t)) {
+      log.error(
+          "{} attempted to use a SignalBarrier already in use by {}", t, ownerAccess.get(this));
+      throw new IllegalStateException(
+          "A second thread tried to acquire a signal barrier that is already owned.");
     }
 
-    /**
-     * Claim the SignalBarrier and block until signaled.
-     *
-     * @throws IllegalStateException If the SignalBarrier already has an owner.
-     * @throws InterruptedException If the thread is interrupted while waiting.
-     */
-    public void await() throws InterruptedException {
-        // Get the thread that would like to await the signal.
-        Thread t = Thread.currentThread();
+    // The current thread owns this barrier.
+    // Park it until the signal.
+    // Time the park.
+    long start = System.nanoTime();
+    log.debug("SignalBarrier created and {} parked.", t);
+    LockSupport.parkNanos(this, timeout);
+    ownerAccess.compareAndSet(this, t, null);
+    log.debug("SignalBarrier broken and {} unparked.", t);
+    long stop = System.nanoTime();
 
-        // If a thread is attempting to await, the current owner should be null.
-        if (!ownerAccess.compareAndSet(this, null, t)) {
-            log.error("{} attempted to use a SignalBarrier already in use by {}", t, ownerAccess.get(this));
-            throw new IllegalStateException("A second thread tried to acquire a signal barrier that is already owned.");
-        }
-
-        // The current thread has taken ownership of this barrier.
-        // Park the current thread until the signal. Record this
-        // signal barrier as the 'blocker'.
-        log.debug("SignalBarrier created and {} parked.", t);
-        LockSupport.park(this);
-
-        // If a thread has called #signal() the owner should already be null.
-        // However the documentation for LockSupport#unpark(Thread) makes it clear that
-        // threads can wake up for absolutely no reason. Do a compare and set
-        // to make sure we don't wipe out a new owner, keeping in mind that only one
-        // thread should be awaiting at any given moment!
-        ownerAccess.compareAndSet(this, t, null);
-        log.debug("SignalBarrier broken and {} unparked.", t);
-
-        // Check to see if we've been unparked because of a thread interrupt.
-        if (t.isInterrupted())
-            throw new InterruptedException();
+    // Check to see if we've been unparked because of a thread interrupt.
+    if (t.isInterrupted()) {
+      throw new InterruptedException();
     }
 
-    /**
-     * Claim the SignalBarrier and block until signaled or the timeout expires.
-     *
-     * @see #awaitNanos(long)
-     *
-     * @throws IllegalStateException If the SignalBarrier already has an owner.
-     * @throws InterruptedException If the thread is interrupted while waiting.
-     *
-     * @param timeout The timeout duration.
-     * @param unit The units of the timeout duration.
-     */
-    public void await(long timeout, @NotNull TimeUnit unit) throws InterruptedException {
-        awaitNanos(unit.toNanos(timeout));
-    }
-
-    /**
-     * Claim the SignalBarrier and block until signaled or the timeout expires.
-     *
-     * @throws IllegalStateException If the SignalBarrier already has an owner.
-     * @throws InterruptedException If the thread is interrupted while waiting.
-     *
-     * @param timeout The timeout duration in nanoseconds.
-     * @return The timeout minus the number of nanoseconds that passed while waiting.
-     */
-    public long awaitNanos(long timeout) throws InterruptedException {
-        if (timeout <= 0)
-            return 0;
-        // Get the thread that would like to await the signal.
-        Thread t = Thread.currentThread();
-
-        // If a thread is attempting to await, the current owner should be null.
-        if (!ownerAccess.compareAndSet(this, null, t)) {
-            log.error("{} attempted to use a SignalBarrier already in use by {}", t, ownerAccess.get(this));
-            throw new IllegalStateException("A second thread tried to acquire a signal barrier that is already owned.");
-        }
-
-        // The current thread owns this barrier.
-        // Park it until the signal.
-        // Time the park.
-        long start = System.nanoTime();
-        log.debug("SignalBarrier created and {} parked.", t);
-        LockSupport.parkNanos(this, timeout);
-        ownerAccess.compareAndSet(this, t, null);
-        log.debug("SignalBarrier broken and {} unparked.", t);
-        long stop = System.nanoTime();
-
-        // Check to see if we've been unparked because of a thread interrupt.
-        if (t.isInterrupted())
-            throw new InterruptedException();
-
-        // Return the number of nanoseconds left in the timeout after what we
-        // just waited.
-        return Math.max(timeout - stop + start, 0L);
-    }
+    // Return the number of nanoseconds left in the timeout after what we
+    // just waited.
+    return Math.max(timeout - stop + start, 0L);
+  }
 }

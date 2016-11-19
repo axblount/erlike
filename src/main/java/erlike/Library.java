@@ -18,10 +18,13 @@
  */
 package erlike;
 
-import org.slf4j.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Duration;
-import java.util.Random;
-import java.util.function.Consumer;
+
+import erlike.functions.Lambda;
+import erlike.functions.PartialConsumer;
 
 /**
  * This class is statically imported to access builtin {@link Proc} functions
@@ -32,110 +35,110 @@ import java.util.function.Consumer;
  * a {@link java.lang.IllegalStateException}.
  */
 public final class Library {
-    private static final Logger log = LoggerFactory.getLogger(Library.class);
+  private static final Logger log = LoggerFactory.getLogger(Library.class);
 
-    // static class
-    private Library() {}
+  // static class
+  private Library() {
+  }
 
-    /**
-     * Get the Proc executing this method.
-     *
-     * @throws java.lang.IllegalStateException If the current thread is not a Proc.
-     *
-     * @return The current thread as a Proc.
-     */
-    private static Proc currentProc() {
-        final Thread t = Thread.currentThread();
-        if (t instanceof Proc) {
-            return (Proc)t;
-        } else {
-            log.error("Non-Proc thread {} attempted to use Erlike Library.", t);
-            throw new IllegalStateException("Cannot call Proc Library functions from outside a Proc.");
-        }
+  /**
+   * Get the Proc executing this method.
+   *
+   * @return The current thread as a Proc.
+   * @throws java.lang.IllegalStateException If the current thread is not a Proc.
+   */
+  private static Proc currentProc() {
+    final Thread t = Thread.currentThread();
+    if (t instanceof Proc) {
+      return (Proc) t;
+    } else {
+      log.error("Non-Proc thread {} attempted to use Erlike Library.", t);
+      throw new IllegalStateException("Cannot call Proc Library functions from outside a Proc.");
     }
+  }
 
-    /**
-     * @see Proc#self()
-     * @return The process id of the current Proc.
-     */
-    public static ProcId self() {
-        return currentProc().self();
-    }
+  /**
+   * @return The process id of the current Proc.
+   * @see Proc#self()
+   */
+  public static ProcRef self() {
+    return currentProc().self();
+  }
 
-    /**
-     * @see Proc#node()
-     * @return The node the current proc is running on.
-     */
-    public static NodeId node() {
-        return currentProc().node();
-    }
+  /**
+   * @return The node the current proc is running on.
+   * @see Proc#node()
+   */
+  public static NodeRef node() {
+    return currentProc().node();
+  }
 
-    /**
-     * @see Proc#receive(Lambda.One, Duration, Runnable)
-     */
-    public static void receive(Lambda.One<Object> handler, Duration timeout, Runnable timeoutHandler)
-            throws Exception {
-        currentProc().receive(handler, timeout, timeoutHandler);
-    }
+  /**
+   * @see Proc#receive(Lambda.One, Duration, Runnable)
+   */
+  public static void receive(Lambda.One<Object> handler, Duration timeout, Runnable timeoutHandler)
+      throws Exception {
+    currentProc().receive(handler, timeout, timeoutHandler);
+  }
 
-    /**
-     * @see Proc#receive(Lambda.One, Duration)
-     */
-    public static void receive(Lambda.One<Object> handler, Duration timeout)
-            throws Exception {
-        receive(handler, timeout, null);
-    }
+  /**
+   * @see Proc#receive(Lambda.One, Duration)
+   */
+  public static void receive(Lambda.One<Object> handler, Duration timeout)
+      throws Exception {
+    receive(handler, timeout, null);
+  }
 
-    /**
-     * @see Proc#receive(Lambda.One)
-     */
-    public static void receive(Lambda.One<Object> handler)
-            throws Exception {
-        receive(handler, null, null);
-    }
+  /**
+   * @see Proc#receive(Lambda.One)
+   */
+  public static void receive(Lambda.One<Object> handler)
+      throws Exception {
+    receive(handler, null, null);
+  }
 
-    /**
-     * @see Proc#receive(PartialConsumer, Duration, Runnable)
-     */
-    public static void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
-            throws Exception {
-        currentProc().receive(handler, timeout, timeoutHandler);
-    }
+  /**
+   * @see Proc#receive(PartialConsumer, Duration, Runnable)
+   */
+  public static void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
+      throws Exception {
+    currentProc().receive(handler, timeout, timeoutHandler);
+  }
 
-    /**
-     * @see Proc#receive(PartialConsumer, Duration)
-     */
-    public static void receive(PartialConsumer handler, Duration timeout)
-            throws Exception {
-        receive(handler, timeout, null);
-    }
+  /**
+   * @see Proc#receive(PartialConsumer, Duration)
+   */
+  public static void receive(PartialConsumer handler, Duration timeout)
+      throws Exception {
+    receive(handler, timeout, null);
+  }
 
-    /**
-     * @see Proc#receive(PartialConsumer)
-     */
-    public static void receive(PartialConsumer handler)
-            throws Exception {
-        receive(handler, null, null);
-    }
+  /**
+   * @see Proc#receive(PartialConsumer)
+   */
+  public static void receive(PartialConsumer handler)
+      throws Exception {
+    receive(handler, null, null);
+  }
 
-    /**
-     * @see Proc#exit()
-     */
-    public static void exit() {
-        currentProc().exit();
-    }
+  /**
+   * @see Proc#exit()
+   */
+  public static void exit() {
+    currentProc().exit();
+  }
 
-    /**
-     * @see Proc#link(ProcId)
-     */
-    public static void link(ProcId other) {
-        currentProc().link(other);
-    }
+  /**
+   * @see Proc#link(ProcRef)
+   */
+  public static void link(ProcRef other) {
+    currentProc().link(other);
+  }
 
-    /**
-     * @see Proc#unlink(ProcId)
-     */
-    public static void unlink(ProcId other) {
-        currentProc().unlink(other);
-    }
+  /**
+   * @see Proc#unlink(ProcRef)
+   */
+  public static void unlink(ProcRef other) {
+    currentProc().unlink(other);
+  }
 }

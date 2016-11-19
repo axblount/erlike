@@ -34,7 +34,7 @@ public class LinkTest {
         Node node = new Node("linkChainExample");
 
         // This is the canary, when it stops printing the chain is dead!
-        ProcId last = node.spawn(() -> {
+        ProcRef last = node.spawn(() -> {
             Thread.sleep(2000);
             fail("The canary lived too long.");
         });
@@ -69,13 +69,13 @@ public class LinkTest {
     public void linkShouldntBreak() throws InterruptedException {
         Node node = new Node("linkShouldntBreak");
 
-        ProcId first = node.spawn(() -> {
+        ProcRef first = node.spawn(() -> {
             // exit normally as soon as we receive a message.
             // A normal exit should not cause the second proc to die.
             receive(obj -> exit());
         });
 
-        ProcId watcher = node.spawn(() -> {
+        ProcRef watcher = node.spawn(() -> {
             receive(obj -> exit(),
                     ofMillis(1000),
                     () -> fail("The link killed the other process."));
