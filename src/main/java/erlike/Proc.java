@@ -27,8 +27,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import erlike.functions.CaseConsumer;
 import erlike.functions.Lambda;
-import erlike.functions.PartialConsumer;
 
 import static java.util.Objects.requireNonNull;
 
@@ -74,8 +74,8 @@ public abstract class Proc extends Thread {
    *
    * @see #link(ProcRef)
    * @see #unlink(ProcRef)
-   * @see #completeLink(ProcRef)
-   * @see #completeUnlink(ProcRef)
+   * @see #addLink(ProcRef)
+   * @see #removeLink(ProcRef)
    */
   private final Set<ProcRef> links;
 
@@ -85,8 +85,7 @@ public abstract class Proc extends Thread {
   public Proc(Node node) {
     super(node, "");
 
-    this.node = requireNonNull(node, "Proc cannot be bound to null Node.");
-    ;
+    this.node = requireNonNull(node, "Proc must be bound to a Node.");
     selfProcRef = new LocalProcRef(this);
     mailbox = new Mailbox<>();
     links = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -107,9 +106,9 @@ public abstract class Proc extends Thread {
     requireNonNull(msg);
 
     if (msg instanceof SystemMail)
-    // TODO In the future this will have to handle
-    // procs being configured to trap system mail.
     {
+      // TODO In the future this will have to handle procs being configured to trap system mail.
+      // FIXME: I would rather this happen in the receiving proc.
       ((SystemMail) msg).visit(this);
     } else if (!mailbox.offer(msg)) {
       assert false : "Unreachable, mailbox has no max capacity.";
@@ -246,7 +245,7 @@ public abstract class Proc extends Thread {
    * @see #receive(Lambda.One, Duration)
    * @see #receive(Lambda.One)
    */
-  protected final void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
+  protected final void receive(CaseConsumer handler, Duration timeout, Runnable timeoutHandler)
       throws Exception {
     requireNonNull(handler, "recieve requires a message handler.");
     if (timeout == null && timeoutHandler != null) {
@@ -279,7 +278,7 @@ public abstract class Proc extends Thread {
    * @see #receive(Lambda.One, Duration, Runnable)
    * @see #receive(Lambda.One)
    */
-  protected final void receive(PartialConsumer handler, Duration timeout)
+  protected final void receive(CaseConsumer handler, Duration timeout)
       throws Exception {
     receive(handler, timeout, null);
   }
@@ -292,7 +291,7 @@ public abstract class Proc extends Thread {
    * @see #receive(Lambda.One, Duration, Runnable)
    * @see #receive(Lambda.One, Duration)
    */
-  protected final void receive(PartialConsumer handler)
+  protected final void receive(CaseConsumer handler)
       throws Exception {
     receive(handler, null, null);
   }
@@ -313,7 +312,7 @@ public abstract class Proc extends Thread {
    * @param other The {@link ProcRef} of the Proc to be linked.
    */
   protected final void link(ProcRef other) {
-    completeLink(other);
+    addLink(other);
     other.send(new SystemMail.Link(selfProcRef));
   }
 
@@ -324,16 +323,16 @@ public abstract class Proc extends Thread {
    * @param other The {@link ProcRef} of the Proc to be unlinked.
    */
   protected final void unlink(ProcRef other) {
-    completeUnlink(other);
+    removeLink(other);
     other.send(new SystemMail.Unlink(selfProcRef));
   }
 
-  final void completeLink(ProcRef other) {
+  final void addLink(ProcRef other) {
     log.debug("Linked {} and {}.", this, other);
     links.add(other);
   }
 
-  final void completeUnlink(ProcRef other) {
+  final void removeLink(ProcRef other) {
     log.debug("Unlinked {} and {}.", this, other);
     links.remove(other);
   }

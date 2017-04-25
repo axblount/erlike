@@ -58,7 +58,7 @@ class Server {
 
     private void outgoing() throws Exception {
         while (true) {
-            receive(new PartialConsumer().match(Envelope.class, (env) -> {
+            receive(new CaseConsumer().match(Envelope.class, (env) -> {
                 Socket socket = connections.get(env.pid.getNodeId());
                 if (socket == null)
                     return; // TODO: retry connection!

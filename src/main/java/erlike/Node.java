@@ -21,13 +21,19 @@ package erlike;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketAddress;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import erlike.functions.Lambda;
 
@@ -51,6 +57,9 @@ import static java.util.Objects.requireNonNull;
 public class Node extends ThreadGroup {
   private static final Logger log = LoggerFactory.getLogger(Node.class);
 
+  /**
+   * A reference to itself.
+   */
   private final NodeRef selfNodeRef;
 
   /**
@@ -65,6 +74,13 @@ public class Node extends ThreadGroup {
    */
   private final List<Throwable> uncaughtExceptions;
 
+  private final AtomicLong nextNodeId;
+
+  /**
+   * Remote linked nodes.
+   */
+  private final ConcurrentMap<Long, RemoteNode> remoteNodes;
+
   /**
    * Create a new Node.
    *
@@ -75,7 +91,26 @@ public class Node extends ThreadGroup {
     this.selfNodeRef = new LocalNodeRef(this);
     this.procs = new ConcurrentHashMap<>();
     this.uncaughtExceptions = Collections.synchronizedList(new LinkedList<>());
+    this.nextNodeId = new AtomicLong(1000);
+    this.remoteNodes = new ConcurrentHashMap<>();
     log.debug("Node starting: {}.", name);
+
+    // spawn(this::server);
+  }
+
+  private void server() {
+    try {
+      ServerSocket server = new ServerSocket();
+      server.setReuseAddress(true);
+      server.bind(InetSocketAddress.createUnresolved("localhost", 12321));
+      while (!server.isClosed()) {
+        Socket socket = server.accept();
+        long id = this.nextNodeId.getAndIncrement();
+        remoteNodes.put(id, new RemoteNode(this, id, socket));
+      }
+    } catch (IOException e) {
+      log.error("Couldn't start server.", e);
+    }
   }
 
   /**
@@ -184,22 +219,6 @@ public class Node extends ThreadGroup {
         zero.run();
       }
     };
-    procs.put(proc.getId(), proc);
-    proc.start();
-    log.debug("{} spawned in {}", proc, this);
-    return proc.self();
-  }
-
-  /**
-   * Spawn a recursive proc.
-   *
-   * @param rec The body of the proc.
-   * @param t   The initial argument.
-   * @param <T> The type of the argument and the body's return type.
-   * @return The ProcRef of the spawned Proc.
-   */
-  public <T> ProcRef spawnRecursive(Lambda.Recursive<T> rec, T t) {
-    Proc proc = new Lambda.Rec<>(this, requireNonNull(rec), requireNonNull(t));
     procs.put(proc.getId(), proc);
     proc.start();
     log.debug("{} spawned in {}", proc, this);

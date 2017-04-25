@@ -25,19 +25,21 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * A {@link java.util.function.Consumer} that is only defined for certain types.
+ * Similar to {@link java.util.function.Consumer} but it contains {@link Clause}s that collectively
+ * match and then consume input. The input can be matched based on type or using a
+ * {@link org.hamcrest.Matcher}.
  */
-public class PartialConsumer implements Lambda.One<Object> {
+public class CaseConsumer implements Lambda.One<Object> {
 
   /**
-   * The clauses composing a PartialConsumer.
+   * The clauses composing a CaseConsumer.
    */
-  private List<TypeClause<?>> clauses;
+  private List<Clause> clauses;
 
   /**
-   * Create a new PartialConsumer that matches no objects.
+   * Create a new CaseConsumer that matches no objects.
    */
-  public PartialConsumer() {
+  public CaseConsumer() {
     clauses = new LinkedList<>();
   }
 
@@ -50,7 +52,7 @@ public class PartialConsumer implements Lambda.One<Object> {
    */
   @Override
   public void accept(Object arg) throws Exception {
-    for (TypeClause<?> c : clauses) {
+    for (Clause c : clauses) {
       if (c.matches(arg)) {
         c.accept(arg);
         return;
@@ -61,13 +63,13 @@ public class PartialConsumer implements Lambda.One<Object> {
   }
 
   /**
-   * Determine if the PartialConsumer is defined at a given value, according to its type.
+   * Determine if the CaseConsumer is defined at a given value, according to its type.
    *
    * @param value The value to be tested.
-   * @return true, if this PartialConsumer is defined at value. false otherwise.
+   * @return true, if this CaseConsumer is defined at value. false otherwise.
    */
   public boolean isDefinedAt(Object value) {
-    for (TypeClause<?> c : clauses) {
+    for (Clause c : clauses) {
       if (c.matches(value)) {
         return true;
       }
@@ -76,49 +78,49 @@ public class PartialConsumer implements Lambda.One<Object> {
   }
 
   /**
-   * Add a clause to this PartialConsumer that matches a given type.
+   * Add a clause to this CaseConsumer that matches a given type.
    *
    * @param <T>  The type that this clause will match.
    * @param type The Class object representing the type this clause will match.
    * @param body The consumer that will handle objects of this type.
    * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
    */
-  public <T> PartialConsumer match(Class<T> type, Lambda.One<T> body) {
+  public <T> CaseConsumer match(Class<T> type, Lambda.One<T> body) {
     clauses.add(new TypeClause<>(type, body));
     return this;
   }
 
-  public <T> PartialConsumer match(Class<T> type, Matcher<T> matcher, Lambda.One<T> body) {
+  public <T> CaseConsumer match(Class<T> type, Matcher<T> matcher, Lambda.One<T> body) {
     clauses.add(new MatcherClause<>(type, matcher, body));
     return this;
   }
 
-  public <T> PartialConsumer match(Class<T> type, Predicate<T> predicate, Lambda.One<T> body) {
+  public <T> CaseConsumer match(Class<T> type, Predicate<T> predicate, Lambda.One<T> body) {
     clauses.add(new PredicateClause<>(type, predicate, body));
     return this;
   }
 
   /**
-   * Add a clause to this PartialConsumer that matches a given type.
+   * Add a clause to this CaseConsumer that matches a given type.
    *
    * @param <T>  The type that this clause will match.
    * @param type The Class object representing the type this clause will match.
    * @param body The consumer that will handle objects of this type.
    * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
    */
-  public <T> PartialConsumer exactMatch(Class<T> type, Lambda.One<T> body) {
+  public <T> CaseConsumer exactMatch(Class<T> type, Lambda.One<T> body) {
     clauses.add(new ExactTypeClause<>(type, body));
     return this;
   }
 
   /**
-   * Add a default clause to this PartialConsumer that will handle any object.
+   * Add a default clause to this CaseConsumer that will handle any object.
    * This is equivalent to {@code #match(Object.class, ...)}.
    *
    * @param body The consumer that will handle any object.
    * @return {@code this}, so that calls to {@link #match} and {@link #otherwise} can be chained.
    */
-  public PartialConsumer otherwise(Lambda.One<Object> body) {
+  public CaseConsumer otherwise(Lambda.One<Object> body) {
     return match(Object.class, body);
   }
 }

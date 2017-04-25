@@ -23,7 +23,7 @@ import static org.hamcrest.Matchers.*;
 
 import java.time.Duration;
 
-import erlike.functions.PartialConsumer;
+import erlike.functions.CaseConsumer;
 
 import static erlike.Library.*;
 import static org.junit.Assert.*;
@@ -106,7 +106,7 @@ public class ProcTest {
 
         ProcRef pid = node.spawn(() -> {
             while (true) {
-                receive(new PartialConsumer()
+                receive(new CaseConsumer()
                         .match(A.class, a -> aFlag.raise())
                         .match(B.class, b -> bFlag.raise())
                         .otherwise(obj -> exit()));

@@ -22,10 +22,13 @@ import java.util.AbstractQueue;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Predicate;
+
+import javax.annotation.Nonnull;
 
 /**
  * Unbounded MPSC lock-free queue with blocking calls. Hopefully this works. <p> Based on:
@@ -94,9 +97,8 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
 
   @Override
   public boolean offer(E e) {
-    if (e == null) {
-      throw new NullPointerException();
-    }
+    Objects.requireNonNull(e);
+
     Node<E> newTail = new Node<>(e);
     Node<E> oldTail = tailAccess.getAndSet(this, newTail);
 
@@ -220,9 +222,7 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
 
   @Override
   public int drainTo(Collection<? super E> c, int maxElements) {
-    if (c == null) {
-      throw new NullPointerException();
-    }
+    Objects.requireNonNull(c);
     if (c == this) {
       throw new IllegalArgumentException("a queue cannot drain to itself");
     }
@@ -256,9 +256,9 @@ public class Mailbox<E> extends AbstractQueue<E> implements BlockingQueue<E> {
    * @return The item stored in the removed node.
    */
   private E removeNode(Node<E> prev, Node<E> node) {
-    if (prev == null || node == null) {
-      throw new NullPointerException();
-    }
+    Objects.requireNonNull(prev);
+    Objects.requireNonNull(node);
+
     if (prev == node) {
       throw new IllegalArgumentException("Corrupt mailbox");
     }

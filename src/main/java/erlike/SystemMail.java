@@ -61,7 +61,7 @@ interface SystemMail extends Serializable {
 
     @Override
     public void visit(Proc proc) {
-      proc.completeLink(getSender());
+      proc.addLink(getSender());
     }
   }
 
@@ -77,7 +77,7 @@ interface SystemMail extends Serializable {
 
     @Override
     public void visit(Proc proc) {
-      proc.completeUnlink(getSender());
+      proc.removeLink(getSender());
     }
   }
 

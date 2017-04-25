@@ -18,68 +18,64 @@
  */
 package erlike.functions;
 
-import erlike.Node;
-import erlike.Proc;
-
 /**
  * The class provides functional interfaces for anonymous procs.
  */
-public class Lambda {
+public final class Lambda {
+  private Lambda() {}
 
   /**
-   * A recursive proc.
-   *
-   * @param <T> The type of the recursive argument.
+   * Takes no arguments, returns nothing, and can throw an exception.
    */
-  public static class Rec<T> extends Proc {
-    private final Recursive<T> lambda;
-    private final T initArg;
-
-    public Rec(Node node, final Recursive<T> lambda, final T initArg) {
-      super(node);
-      if (lambda == null || initArg == null) {
-        throw new NullPointerException();
-      }
-      this.lambda = lambda;
-      this.initArg = initArg;
-    }
-
-    @Override
-    protected void main() throws Exception {
-      T arg = initArg;
-      while (arg != null) {
-        arg = lambda.apply(arg);
-      }
-    }
-  }
-
   @FunctionalInterface
   public interface Zero {
     void run() throws Exception;
   }
 
+  /**
+   * Takes one argument, returns nothing, and can throw an exception.
+   *
+   * @param <A> Type of the first argument.
+   */
   @FunctionalInterface
   public interface One<A> {
     void accept(A a) throws Exception;
   }
 
+  /**
+   * Takes two arguments, returns nothing, and can throw an exception.
+   *
+   * @param <A> Type of the first argument.
+   * @param <B> Type of the second argument.
+   */
   @FunctionalInterface
   public interface Two<A, B> {
     void accept(A a, B b) throws Exception;
   }
 
+  /**
+   * Takes three arguments, returns nothing, and can throw an exception.
+   *
+   * @param <A> Type of the first argument.
+   * @param <B> Type of the second argument.
+   * @param <C> Type of the third argument.
+   */
   @FunctionalInterface
   public interface Three<A, B, C> {
     void accept(A a, B b, C c) throws Exception;
   }
 
+  /**
+   * Takes four arguments, returns nothing, and can throw an exception.
+   * If your proc requires more than four arguments, wrap them up in an object.
+   *
+   * @param <A> Type of the first argument.
+   * @param <B> Type of the second argument.
+   * @param <C> Type of the third argument.
+   * @param <D> Type of the fourth argument.
+   */
   @FunctionalInterface
   public interface Four<A, B, C, D> {
     void accept(A a, B b, C c, D d) throws Exception;
-  }
-
-  @FunctionalInterface
-  public interface Recursive<T> {
-    T apply(T arg) throws Exception;
   }
 }

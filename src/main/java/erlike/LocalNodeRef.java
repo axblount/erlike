@@ -52,11 +52,6 @@ class LocalNodeRef implements NodeRef {
   }
 
   @Override
-  public <T> ProcRef spawnRecursive(Lambda.Recursive<T> rec, T t) {
-    return node.spawnRecursive(rec, t);
-  }
-
-  @Override
   public <A, B> ProcRef spawn(Lambda.Two<A, B> two, A a, B b) {
     return node.spawn(two, a, b);
   }

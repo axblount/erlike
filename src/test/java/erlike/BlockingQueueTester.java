@@ -180,7 +180,7 @@ public abstract class BlockingQueueTester {
     @Test
     public void testTimedOfferNull() throws InterruptedException {
         final BlockingQueue q = emptyCollection();
-        long startTime = System.nanoTime();
+        long startTime = System.currentTimeMillis();
         try {
             q.offer(null, LONG_DELAY_MS, MILLISECONDS);
             fail("Should throw NPE");

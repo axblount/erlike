@@ -27,17 +27,25 @@ import erlike.functions.Lambda;
 public interface NodeRef {
   ProcRef spawn(Class<? extends Proc> procType, Object... args);
 
-  ProcRef spawn(Class<? extends Proc> procType);
+  default ProcRef spawn(Class<? extends Proc> procType) {
+    return spawn(procType, new Object[0]);
+  }
 
   ProcRef spawn(Lambda.Zero zero);
 
-  <A> ProcRef spawn(Lambda.One<A> one, A a);
+  default <A> ProcRef spawn(Lambda.One<A> one, A a) {
+    return spawn(() -> one.accept(a));
+  }
 
-  <T> ProcRef spawnRecursive(Lambda.Recursive<T> rec, T t);
+  default <A, B> ProcRef spawn(Lambda.Two<A, B> two, A a, B b) {
+    return spawn(() -> two.accept(a, b));
+  }
 
-  <A, B> ProcRef spawn(Lambda.Two<A, B> two, A a, B b);
+  default <A, B, C> ProcRef spawn(Lambda.Three<A, B, C> three, A a, B b, C c) {
+    return spawn(() -> three.accept(a, b, c));
+  }
 
-  <A, B, C> ProcRef spawn(Lambda.Three<A, B, C> three, A a, B b, C c);
-
-  <A, B, C, D> ProcRef spawn(Lambda.Four<A, B, C, D> four, A a, B b, C c, D d);
+  default <A, B, C, D> ProcRef spawn(Lambda.Four<A, B, C, D> four, A a, B b, C c, D d) {
+    return spawn(() -> four.accept(a, b, c, d));
+  }
 }

@@ -23,8 +23,8 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 
+import erlike.functions.CaseConsumer;
 import erlike.functions.Lambda;
-import erlike.functions.PartialConsumer;
 
 /**
  * This class is statically imported to access builtin {@link Proc} functions
@@ -98,25 +98,25 @@ public final class Library {
   }
 
   /**
-   * @see Proc#receive(PartialConsumer, Duration, Runnable)
+   * @see Proc#receive(CaseConsumer, Duration, Runnable)
    */
-  public static void receive(PartialConsumer handler, Duration timeout, Runnable timeoutHandler)
+  public static void receive(CaseConsumer handler, Duration timeout, Runnable timeoutHandler)
       throws Exception {
     currentProc().receive(handler, timeout, timeoutHandler);
   }
 
   /**
-   * @see Proc#receive(PartialConsumer, Duration)
+   * @see Proc#receive(CaseConsumer, Duration)
    */
-  public static void receive(PartialConsumer handler, Duration timeout)
+  public static void receive(CaseConsumer handler, Duration timeout)
       throws Exception {
     receive(handler, timeout, null);
   }
 
   /**
-   * @see Proc#receive(PartialConsumer)
+   * @see Proc#receive(CaseConsumer)
    */
-  public static void receive(PartialConsumer handler)
+  public static void receive(CaseConsumer handler)
       throws Exception {
     receive(handler, null, null);
   }
